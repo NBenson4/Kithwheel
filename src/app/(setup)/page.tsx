@@ -20,6 +20,7 @@ const capabilities = [
     description:
       'Build age-group class rotations, assign teachers and rooms, then keep the schedule easy for families to find.',
     note: 'Classes · teachers · rooms',
+    soon: false,
   },
   {
     number: '02',
@@ -27,6 +28,7 @@ const capabilities = [
     description:
       'Handle registration, class choices, capacity and waitlists alongside the schedule they belong to.',
     note: 'Registration · sign-ups · waitlists',
+    soon: true,
   },
   {
     number: '03',
@@ -34,6 +36,7 @@ const capabilities = [
     description:
       'Share announcements and materials lists with the families who need them, right beside class details.',
     note: 'Announcements · materials · schedules',
+    soon: true,
   },
   {
     number: '04',
@@ -41,6 +44,7 @@ const capabilities = [
     description:
       'Collect semester fees and supply payments through Stripe, and track the volunteer hours your co-op requires.',
     note: 'Fees · supplies · volunteer hours',
+    soon: true,
   },
 ];
 
@@ -92,8 +96,8 @@ export default function HomePage() {
               The co-op management app that keeps every moving part in sync.
             </p>
             <p className="kw-hero-description">
-              Bring class rotations, family sign-ups, fees, materials and volunteer hours into one
-              shared place.
+              Plan class rotations, teachers and rooms in one shared place today. Family sign-ups,
+              class updates, fees and volunteer hours are coming soon.
             </p>
             <div className="kw-hero-actions">
               <a className="kw-button kw-button-dark" href={contactHref}>
@@ -259,13 +263,14 @@ export default function HomePage() {
         <section className="kw-capability-ribbon" aria-label="Kithwheel features">
           <span>Class rotations</span>
           <i />
-          <span>Family sign-ups</span>
+          <span className="kw-ribbon-soon">Coming soon:</span>
+          <span className="kw-ribbon-later">Family sign-ups</span>
           <i />
-          <span>Class updates</span>
+          <span className="kw-ribbon-later">Class updates</span>
           <i />
-          <span>Payments</span>
+          <span className="kw-ribbon-later">Payments</span>
           <i />
-          <span>Volunteer hours</span>
+          <span className="kw-ribbon-later">Volunteer hours</span>
         </section>
 
         <section className="kw-toolkit" id="toolkit" aria-labelledby="toolkit-title">
@@ -290,7 +295,10 @@ export default function HomePage() {
               <article className="kw-capability" key={item.number}>
                 <span className="kw-capability-number">{item.number}</span>
                 <div className="kw-capability-main">
-                  <h3>{item.title}</h3>
+                  <h3>
+                    {item.title}
+                    {item.soon ? <span className="kw-soon-badge">Coming soon</span> : null}
+                  </h3>
                   <p>{item.description}</p>
                 </div>
                 <span className="kw-capability-note">{item.note}</span>
@@ -310,9 +318,9 @@ export default function HomePage() {
               good part of <span className="kw-together-serif">co-op.</span>
             </h2>
             <p>
-              Co-op coordination takes a lot of care. Kithwheel brings the schedules, family
-              details, class notes, payments and volunteer tracking into one place built around how
-              a co-op works.
+              Co-op coordination takes a lot of care. Kithwheel starts with the schedule, and is
+              growing to bring family details, class notes, payments and volunteer tracking into one
+              place built around how a co-op works.
             </p>
             <a className="kw-button kw-button-paper" href={contactHref}>
               Say hello <ArrowRight aria-hidden="true" size={15} />
