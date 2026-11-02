@@ -53,8 +53,9 @@ function returnedError(): string | undefined {
 }
 
 /**
- * Signs in with Google through `authClient.signIn.oauth2` (never `signIn.social`: the provider
- * is the generic one registered by `src/lib/auth.ts`). Place it in sign-in and sign-up forms.
+ * Signs in with Google through `authClient.signIn.social`. Since Better Auth 1.7 the generic
+ * provider registered by `src/lib/auth.ts` is a regular social provider. Place it in sign-in
+ * and sign-up forms.
  *
  *   <GoogleSignInButton callbackURL="/dashboard" />
  */
@@ -81,8 +82,8 @@ export function GoogleSignInButton({
   async function handleClick() {
     setPending(true);
     setError(undefined);
-    const { error: signInError } = await authClient.signIn.oauth2({
-      providerId: GOOGLE_PROVIDER_ID,
+    const { error: signInError } = await authClient.signIn.social({
+      provider: GOOGLE_PROVIDER_ID,
       callbackURL,
       errorCallbackURL: errorReturnURL(errorCallbackURL),
     });

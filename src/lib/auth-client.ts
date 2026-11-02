@@ -6,14 +6,13 @@
 // catch-all route handler on that same origin.
 // Includes adminClient so the user's role is inferred and admin permission
 // helpers are available to client UI. Server-side enforcement still belongs in
-// route handlers and server helpers. genericOAuthClient adds signIn.oauth2, used by
-// the Google sign-in button.
+// route handlers and server helpers.
 
-import { adminClient, genericOAuthClient } from 'better-auth/client/plugins';
+import { adminClient } from 'better-auth/client/plugins';
 import { createAuthClient } from 'better-auth/react';
 
 export const authClient = createAuthClient({
-  plugins: [adminClient(), genericOAuthClient()],
+  plugins: [adminClient()],
 });
 
 export const { signIn, signUp, signOut, useSession } = authClient;
