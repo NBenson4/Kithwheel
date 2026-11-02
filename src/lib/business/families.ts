@@ -214,6 +214,31 @@ export async function registrableClassIds(coopId: string): Promise<Set<string>> 
   );
 }
 
+/**
+ * Classes each age group takes in the current schedule (rotation age group → class ids).
+ * Placement by age group puts a child into every class of their group's rotation.
+ */
+export async function classesByAgeGroup(coopId: string): Promise<Map<string, string[]>> {
+  const schedule = await readPublicSchedule(coopId);
+  const groups = new Map<string, string[]>();
+  for (const rotation of schedule?.rotations ?? []) {
+    const key = rotation.ageGroup.trim().toLowerCase();
+    groups.set(key, [...(groups.get(key) ?? []), ...rotation.classes.map((item) => item.id)]);
+  }
+  return groups;
+}
+
+export const ageGroupKey = (ageGroup: string | null | undefined) =>
+  (ageGroup ?? '').trim().toLowerCase();
+
+/** The classes a newly registered child is placed in, when the co-op places by age group. */
+export async function autoPlacementFor(coopId: string) {
+  const coop = await prisma.coop.findUnique({ where: { id: coopId }, select: { autoPlace: true } });
+  if (!coop?.autoPlace) return () => [] as string[];
+  const groups = await classesByAgeGroup(coopId);
+  return (ageGroup: string | null | undefined) => groups.get(ageGroupKey(ageGroup)) ?? [];
+}
+
 // ── Registration ────────────────────────────────────────────────────────────
 
 export type RegistrationOutcome =
@@ -229,13 +254,15 @@ export type RegistrationOutcome =
   | { status: 'invalid'; message: string };
 
 /**
- * Creates a family with its children and class choices. When `allowAnyClass` is false
- * (public registration), choices must come from the current published schedule.
+ * Creates a family and its children. Coordinators place children in classes: either the
+ * co-op places new children by age group automatically, or a coordinator does it later.
+ * A coordinator adding a family may also pick classes directly (`source: 'coordinator'`);
+ * families registering themselves never choose classes.
  */
 export async function registerFamily(
   coopId: string,
   input: FamilyCreate,
-  options: { allowAnyClass: boolean },
+  options: { source: 'public' | 'coordinator' },
 ): Promise<RegistrationOutcome> {
   const existing = await prisma.coopFamily.findUnique({
     where: { coopId_email: { coopId, email: input.email } },
@@ -243,23 +270,18 @@ export async function registerFamily(
   });
   if (existing) return { status: 'already_registered', ...existing };
 
-  const requested = input.children.flatMap((child) => child.classIds);
-  const allowed = options.allowAnyClass
-    ? new Set(
-        (
-          await prisma.coopClass.findMany({
-            where: { coopId, id: { in: requested } },
-            select: { id: true },
-          })
-        ).map((item) => item.id),
-      )
-    : await registrableClassIds(coopId);
-  if (requested.some((id) => !allowed.has(id))) {
-    return {
-      status: 'invalid',
-      message: 'One of the classes is no longer offered. Refresh the page and try again.',
-    };
+  const chosen = (child: FamilyCreate['children'][number]) =>
+    options.source === 'coordinator' ? child.classIds : [];
+  const requested = input.children.flatMap(chosen);
+  if (requested.length) {
+    const found = await prisma.coopClass.count({
+      where: { coopId, id: { in: [...new Set(requested)] } },
+    });
+    if (found !== new Set(requested).size) {
+      return { status: 'invalid', message: 'One of those classes no longer exists.' };
+    }
   }
+  const byAgeGroup = await autoPlacementFor(coopId);
 
   const accessToken = newToken();
   try {
@@ -284,7 +306,9 @@ export async function registerFamily(
             ageGroup: childInput.ageGroup || null,
           },
         });
-        for (const classId of [...new Set(childInput.classIds)]) {
+        const picks = chosen(childInput);
+        const classIds = picks.length ? picks : byAgeGroup(childInput.ageGroup);
+        for (const classId of [...new Set(classIds)]) {
           const placed = await placeChild(tx, coopId, child.id, classId);
           if (!placed) continue;
           (placed.status === 'ENROLLED' ? enrolled : waitlisted).push({

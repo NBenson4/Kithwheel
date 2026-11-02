@@ -502,6 +502,13 @@ export function CoordinatorWorkspace() {
                       coopId={coopId}
                       settings={settings}
                       onSettings={setSettings}
+                      rotations={(currentSchedule?.rotations ?? []).map((rotation) => ({
+                        ageGroup: rotation.ageGroup,
+                        classes: rotation.entries.map((entry) => ({
+                          id: entry.class.id,
+                          name: entry.class.name,
+                        })),
+                      }))}
                     />
                   )}
                   {tab === 'checkin' && (

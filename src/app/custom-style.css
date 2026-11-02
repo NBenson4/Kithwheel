@@ -147,7 +147,7 @@
   --kw-ink: #23392f;
   --kw-forest: #315b46;
   --kw-forest-deep: #243f33;
-  --kw-muted: #68776b;
+  --kw-muted: #4f5d53;
   --kw-line: #dddcd0;
   --kw-clay: #bd6849;
   --kw-clay-light: #f0d8c8;
@@ -276,7 +276,7 @@
 
 .kw-nav a,
 .kw-header-cta {
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 500;
   letter-spacing: -0.01em;
 }
@@ -323,10 +323,10 @@
   justify-content: center;
   padding: 0 11px;
   border: 0;
-  color: #526357;
+  color: #3f5145;
   background: transparent;
   font: inherit;
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 600;
   text-decoration: none;
   white-space: nowrap;
@@ -371,8 +371,8 @@
   align-items: center;
   gap: 10px;
   margin: 0 0 24px;
-  color: #66776a;
-  font-size: 10px;
+  color: #4f5f53;
+  font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.16em;
   line-height: 1.3;
@@ -414,7 +414,7 @@
   max-width: 420px;
   margin: 12px 0 0;
   color: var(--kw-muted);
-  font-size: 14px;
+  font-size: 17px;
   line-height: 1.75;
 }
 
@@ -433,7 +433,7 @@
   justify-content: center;
   gap: 11px;
   padding: 0 18px;
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 500;
   letter-spacing: -0.01em;
   transition:
@@ -455,8 +455,8 @@
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  color: #59695d;
-  font-size: 13px;
+  color: #3f5145;
+  font-size: 15px;
   transition: color 160ms ease;
 }
 
@@ -469,8 +469,8 @@
   align-items: center;
   gap: 10px;
   margin-top: 48px;
-  color: #718074;
-  font-size: 11px;
+  color: #56655a;
+  font-size: 13px;
   letter-spacing: 0.005em;
 }
 
@@ -1075,7 +1075,7 @@
   padding: 16px 24px;
   color: #f1f0e8;
   background: var(--kw-forest-deep);
-  font-size: 11px;
+  font-size: 14px;
   font-weight: 500;
   letter-spacing: 0.02em;
 }
@@ -1158,7 +1158,7 @@
   padding-top: 37px;
   color: var(--kw-clay);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 10px;
+  font-size: 12px;
   letter-spacing: 0.04em;
 }
 
@@ -1178,7 +1178,7 @@
   border-radius: 999px;
   color: #9a5f37;
   background: #f8efe4;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -1197,16 +1197,16 @@
 .kw-capability-main p {
   max-width: 530px;
   margin: 0;
-  color: #6c796f;
-  font-size: 13px;
+  color: #4d5b51;
+  font-size: 16px;
   line-height: 1.7;
 }
 
 .kw-capability-note {
   justify-self: end;
   max-width: 230px;
-  color: #8b948a;
-  font-size: 10px;
+  color: #5f6b62;
+  font-size: 13px;
   letter-spacing: 0.025em;
   line-height: 1.7;
   text-align: right;
@@ -1488,12 +1488,12 @@
 }
 .kw-footer-tagline {
   max-width: 330px;
-  font-size: 10px;
+  font-size: 13px;
   line-height: 1.5;
 }
 .kw-footer-email,
 .kw-copyright {
-  font-size: 10px;
+  font-size: 13px;
   white-space: nowrap;
 }
 .kw-footer-email {
@@ -1574,7 +1574,7 @@
   }
   .kw-header-cta {
     padding: 10px 13px;
-    font-size: 12px;
+    font-size: 14px;
   }
   .kw-auth-nav {
     display: flex;
@@ -1590,7 +1590,7 @@
   .kw-auth-nav .kw-auth-signup {
     min-height: 37px;
     padding-inline: 9px;
-    font-size: 11px;
+    font-size: 13px;
   }
 
   .kw-hero {
@@ -1607,7 +1607,7 @@
   }
   .kw-kicker {
     margin-bottom: 21px;
-    font-size: 9px;
+    font-size: 11px;
   }
   .kw-hero h1 {
     font-size: clamp(57px, 12vw, 78px);
@@ -1621,7 +1621,7 @@
   .kw-hero-description {
     max-width: 470px;
     margin-top: 8px;
-    font-size: 13px;
+    font-size: 16px;
   }
   .kw-hero-actions {
     gap: 17px;
@@ -1694,7 +1694,7 @@
     overflow: hidden;
     min-height: 62px;
     padding-inline: 20px;
-    font-size: 10px;
+    font-size: 13px;
     white-space: nowrap;
   }
   .kw-capability-ribbon i {
@@ -1736,7 +1736,7 @@
     font-size: 18px;
   }
   .kw-capability-main p {
-    font-size: 12px;
+    font-size: 15px;
   }
   .kw-capability-note {
     display: none;
@@ -1982,7 +1982,7 @@
     padding-inline: 18px;
   }
   .kw-capability-ribbon span {
-    font-size: 9px;
+    font-size: 12px;
   }
   .kw-toolkit {
     padding-block: 72px 76px;
@@ -1995,7 +1995,7 @@
     font-size: 17px;
   }
   .kw-capability-main p {
-    font-size: 11px;
+    font-size: 15px;
     line-height: 1.65;
   }
   .kw-together-copy {
@@ -2027,14 +2027,14 @@
     font-size: 17px;
   }
   .kw-contact-action .kw-button {
-    font-size: 12px;
+    font-size: 14px;
   }
   .kw-footer-brand {
     font-size: 14px;
   }
   .kw-footer-email,
   .kw-copyright {
-    font-size: 9px;
+    font-size: 12px;
   }
 }
 
@@ -2147,7 +2147,7 @@
   overflow: hidden;
   margin-right: 8px;
   color: var(--muted-foreground);
-  font-size: 12px;
+  font-size: 14px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -2164,7 +2164,7 @@
   color: var(--foreground);
   background: transparent;
   font: inherit;
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 600;
   text-decoration: none;
   white-space: nowrap;
@@ -2195,8 +2195,8 @@
 
 .kw-dashboard-aside-label {
   margin: 0 0 11px 10px;
-  color: #748075;
-  font-size: 10px;
+  color: #56655a;
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.14em;
 }
@@ -2214,7 +2214,7 @@
   padding: 0 11px;
   border-radius: 6px;
   color: #59695d;
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 550;
   text-decoration: none;
 }
@@ -2230,8 +2230,8 @@
   gap: 9px;
   margin-top: auto;
   padding: 16px 10px 0;
-  color: #66756a;
-  font-size: 11px;
+  color: #4f5d53;
+  font-size: 13px;
   line-height: 1.45;
 }
 
@@ -2270,7 +2270,7 @@
   .kw-dashboard-signout {
     min-height: 36px;
     padding-inline: 7px;
-    font-size: 11px;
+    font-size: 13px;
   }
   .kw-dashboard-layout {
     min-height: calc(100dvh - 63px);
@@ -2414,7 +2414,7 @@
   padding: 0 15px;
   border-radius: 999px;
   color: var(--muted-foreground);
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 600;
   text-decoration: none;
   transition:
@@ -2530,7 +2530,7 @@
 
 .kw-account-details dt {
   color: var(--muted-foreground);
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
 }
 
@@ -2574,7 +2574,7 @@
   color: var(--primary-foreground);
   background: var(--primary);
   font: inherit;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 650;
   cursor: pointer;
 }
@@ -2620,7 +2620,7 @@
 .kw-auth-result a {
   color: var(--primary);
   font-family: "Inter Tight", ui-sans-serif, system-ui, sans-serif;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 650;
   text-decoration: underline;
   text-underline-offset: 3px;

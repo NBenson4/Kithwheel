@@ -63,7 +63,7 @@ export async function POST(request: Request, context: RouteContext) {
   }
 
   try {
-    const outcome = await registerFamily(coop.id, input, { allowAnyClass: false });
+    const outcome = await registerFamily(coop.id, input, { source: 'public' });
     if (outcome.status === 'invalid') {
       return NextResponse.json({ error: outcome.message }, { status: 400 });
     }

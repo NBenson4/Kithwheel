@@ -81,7 +81,7 @@
 .eyebrow {
   margin: 0 0 9px;
   color: var(--muted-foreground);
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 700;
   letter-spacing: 0.13em;
   text-transform: uppercase;
@@ -118,7 +118,7 @@
 .switch {
   margin: 19px 0 0;
   color: var(--muted-foreground);
-  font-size: 13px;
+  font-size: 15px;
   text-align: center;
 }
 
@@ -138,7 +138,7 @@
 
 .back {
   color: var(--muted-foreground);
-  font-size: 13px;
+  font-size: 15px;
   text-decoration: none;
 }
 

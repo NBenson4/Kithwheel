@@ -26,8 +26,8 @@ const capabilities = [
     number: '02',
     title: 'Bring family sign-ups together',
     description:
-      'Handle registration, class choices, capacity and waitlists alongside the schedule they belong to.',
-    note: 'Registration · sign-ups · waitlists',
+      'Families register in minutes. You place children by age group, with exceptions for anyone who tests up, and full classes keep a waitlist.',
+    note: 'Registration · placement · waitlists',
     soon: false,
   },
   {

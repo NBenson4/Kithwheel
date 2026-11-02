@@ -48,6 +48,7 @@ export async function readSettings(coopId: string) {
     shareUrl: coop.shareToken ? shareUrl(coop.shareToken) : null,
     kioskUrl: coop.kioskToken ? kioskUrl(coop.kioskToken) : null,
     registrationOpen: coop.registrationOpen,
+    autoPlace: coop.autoPlace,
     registrationNote: coop.registrationNote,
     timeZone: coop.timeZone,
     meetingDay: coop.meetingDay,

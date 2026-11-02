@@ -85,6 +85,12 @@ test('a co-op runs registration, waitlists, family pages, fees, hours, announcem
       time: '10:00-10:50',
     })
   ).body;
+  const science = (
+    await json(api, 'POST', `/api/coops/${coop.id}/classes`, {
+      name: 'Science Lab',
+      time: '9:00-9:50',
+    })
+  ).body;
   const created = await json(api, 'POST', `/api/coops/${coop.id}/schedules`, {
     title: 'Spring 2027',
   });
@@ -92,7 +98,10 @@ test('a co-op runs registration, waitlists, family pages, fees, hours, announcem
   expect(
     (
       await json(api, 'PATCH', `/api/coops/${coop.id}/schedules/${scheduleId}`, {
-        rotations: [{ ageGroup: 'Ages 5-7', classIds: [art.id, music.id] }],
+        rotations: [
+          { ageGroup: 'Ages 5-7', classIds: [art.id, music.id] },
+          { ageGroup: 'Ages 8-10', classIds: [science.id] },
+        ],
       })
     ).status,
   ).toBe(200);
@@ -135,13 +144,19 @@ test('a co-op runs registration, waitlists, family pages, fees, hours, announcem
   await familyPage.getByLabel('Parent or guardian name').fill('Avery Family');
   await familyPage.getByLabel('Email').fill(firstEmail);
   await familyPage.getByLabel('Name', { exact: true }).fill('Ann');
-  await familyPage.getByRole('checkbox', { name: /Art Studio/ }).check();
+  // Families give an age group; they don't pick classes.
+  await expect(familyPage.getByRole('checkbox', { name: /Art Studio/ })).toHaveCount(0);
+  await familyPage.getByLabel('Age group').selectOption('Ages 5-7');
+  await expect(familyPage.getByText('Ages 5-7 classes: Art Studio, Music Circle')).toBeVisible();
   await familyPage.getByRole('button', { name: 'Register' }).last().click();
   await expect(familyPage.getByRole('heading', { name: 'You’re registered!' })).toBeVisible();
+  // Placed by age group automatically.
   await expect(familyPage.getByText('Ann: Art Studio')).toBeVisible();
+  await expect(familyPage.getByText('Ann: Music Circle')).toBeVisible();
   const familyAUrl = linkIn(firstEmail, /https?:\/\/[^\s<]+\/f\/[A-Za-z0-9_-]+/);
 
-  // A second family wants the same one-seat class and lands on the waitlist.
+  // A second family in the same age group: Art (one seat) is full, so Ben waits.
+  // Class ids a family sends are ignored.
   const secondEmail = `family-b-${randomUUID()}@example.test`;
   const second = await json(
     familyContext.request,
@@ -150,10 +165,11 @@ test('a co-op runs registration, waitlists, family pages, fees, hours, announcem
     {
       parentName: 'Blake Family',
       email: secondEmail,
-      children: [{ name: 'Ben', ageGroup: 'Ages 5-7', classIds: [art.id, music.id] }],
+      children: [{ name: 'Ben', ageGroup: 'Ages 5-7', classIds: [science.id] }],
     },
   );
   expect(second.status).toBe(201);
+  expect(second.body.enrolled).toEqual([{ childName: 'Ben', className: 'Music Circle' }]);
   expect(second.body.waitlisted).toEqual([{ childName: 'Ben', className: 'Art Studio' }]);
   const familyBUrl = linkIn(secondEmail, /https?:\/\/[^\s<]+\/f\/[A-Za-z0-9_-]+/);
   const familyBToken = familyBUrl.split('/f/')[1] ?? '';
@@ -166,22 +182,96 @@ test('a co-op runs registration, waitlists, family pages, fees, hours, announcem
     {
       parentName: 'Blake Family',
       email: secondEmail,
-      children: [{ name: 'Ben', classIds: [music.id] }],
+      children: [{ name: 'Ben', ageGroup: 'Ages 5-7' }],
     },
   );
   expect(repeat.body.status).toBe('already_registered');
 
-  // Family A drops Art; Ben moves off the waitlist and is emailed.
+  // Family pages show classes but can't change them.
   await familyPage.goto(new URL(familyAUrl).pathname);
   await expect(familyPage.getByRole('heading', { name: 'Hi, Avery Family' })).toBeVisible();
-  await familyPage.getByRole('button', { name: 'Drop class' }).click();
-  await familyPage.getByRole('button', { name: 'Yes, drop it' }).click();
-  await expect(familyPage.getByText('No classes yet.')).toBeVisible();
-  await expect
-    .poll(() =>
-      emails().some((item) => item.to === secondEmail && /A seat opened/.test(item.subject ?? '')),
-    )
-    .toBe(true);
+  await expect(familyPage.getByText('Enrolled').first()).toBeVisible();
+  await expect(familyPage.getByRole('button', { name: 'Drop class' })).toHaveCount(0);
+  await expect(familyPage.getByRole('combobox', { name: /Add a class/ })).toHaveCount(0);
+
+  // Placement: the coordinator swaps Art's seat from Ann to Ben, then adds Ann (Ages 5-7)
+  // to Science Lab (Ages 8-10) as an exception.
+  await page.goto(`/dashboard?coop=${coop.id}&tab=families`);
+  const placement = page.locator('section', {
+    has: page.getByRole('heading', { name: 'Class placement' }),
+  });
+  await placement.getByRole('button', { name: /^Art Studio/ }).click();
+  const sidebar = page.getByRole('complementary', { name: 'Who’s in Art Studio' });
+  await expect(sidebar.getByRole('checkbox', { name: /Ann/ })).toBeChecked();
+  await expect(sidebar.getByText('Waitlist')).toBeVisible();
+  await sidebar.getByRole('checkbox', { name: /Ann/ }).uncheck();
+  await sidebar.getByRole('checkbox', { name: /Ben/ }).check();
+  await sidebar.getByRole('button', { name: 'Save 2 changes' }).click();
+  await expect(sidebar.getByRole('button', { name: 'Saved' })).toBeVisible();
+
+  await placement.getByRole('button', { name: /^Science Lab/ }).click();
+  const scienceSidebar = page.getByRole('complementary', { name: 'Who’s in Science Lab' });
+  await scienceSidebar.getByText('Add a child from another age group').click();
+  await scienceSidebar.getByRole('checkbox', { name: /Ann/ }).check();
+  await scienceSidebar.getByRole('button', { name: 'Save 1 change' }).click();
+  await expect(scienceSidebar.getByRole('button', { name: 'Saved' })).toBeVisible();
+
+  const placed = await json(api, 'GET', `/api/coops/${coop.id}/families`);
+  const kids = Object.fromEntries(
+    placed.body.families.flatMap(
+      (family: {
+        children: {
+          name: string;
+          id: string;
+          enrollments: { className: string; status: string }[];
+        }[];
+      }) => family.children.map((child) => [child.name, child]),
+    ),
+  );
+  const classesOf = (name: string) =>
+    kids[name].enrollments
+      .map((entry: { className: string; status: string }) => `${entry.className}:${entry.status}`)
+      .sort();
+  expect(classesOf('Ann')).toEqual(['Music Circle:enrolled', 'Science Lab:enrolled']);
+  expect(classesOf('Ben')).toEqual(['Art Studio:enrolled', 'Music Circle:enrolled']);
+
+  // Moving Ann to Ages 8-10 swaps Ages 5-7 classes for that group's (Science stays).
+  await json(api, 'PATCH', `/api/coops/${coop.id}/children/${kids.Ann.id}`, {
+    ageGroup: 'Ages 8-10',
+    movePlacements: true,
+  });
+
+  // With automatic placement off, a new family waits; "Place everyone" then places them.
+  await json(api, 'PATCH', `/api/coops/${coop.id}/settings`, { autoPlace: false });
+  const third = await json(
+    familyContext.request,
+    'POST',
+    `/api/public/coops/${shareToken}/register`,
+    {
+      parentName: 'Cole Family',
+      email: `family-c-${randomUUID()}@example.test`,
+      children: [{ name: 'Cora', ageGroup: 'Ages 5-7' }],
+    },
+  );
+  expect(third.body.enrolled).toEqual([]);
+  await page.reload();
+  await page.getByRole('button', { name: 'Place everyone by age group' }).click();
+  await page.getByRole('button', { name: 'Place everyone', exact: true }).click();
+  await expect(page.getByText('Placed 1, 1 on waitlists')).toBeVisible();
+  const after = await json(api, 'GET', `/api/coops/${coop.id}/families`);
+  const afterKids = Object.fromEntries(
+    after.body.families.flatMap(
+      (family: {
+        children: { name: string; enrollments: { className: string; status: string }[] }[];
+      }) =>
+        family.children.map((child) => [
+          child.name,
+          child.enrollments.map((entry) => `${entry.className}:${entry.status}`).sort(),
+        ]),
+    ),
+  );
+  expect(afterKids.Ann).toEqual(['Science Lab:enrolled']);
+  expect(afterKids.Cora).toEqual(['Art Studio:waitlisted', 'Music Circle:enrolled']);
 
   // Family B logs volunteer hours from their page.
   await familyPage.goto(`/f/${familyBToken}`);
@@ -238,7 +328,9 @@ test('a co-op runs registration, waitlists, family pages, fees, hours, announcem
   await page.reload();
   await expect(page.getByText(/in .*\(tablet\)/)).toBeVisible();
   await page.getByRole('button', { name: 'Check in' }).first().click();
-  await expect(page.getByText('Not marked yet').locator('..').getByText('0')).toBeVisible();
+  await expect(
+    page.getByText('Checked in', { exact: true }).locator('..').getByText('2', { exact: true }),
+  ).toBeVisible();
 
   // Spreadsheet import and copying a schedule.
   await page.getByRole('button', { name: 'Schedule', exact: true }).click();
@@ -302,19 +394,21 @@ test('a co-op runs registration, waitlists, family pages, fees, hours, announcem
     (await json(familyContext.request, 'POST', `/api/public/coops/${shareToken}/register`, {}))
       .status,
   ).not.toBe(201);
-  // A family link can't drop another family's class.
-  const homeB = await json(familyContext.request, 'GET', `/api/public/families/${familyBToken}`);
-  const familyAToken = new URL(familyAUrl).pathname.split('/f/')[1] ?? '';
-  const benEnrollment = homeB.body.children[0].enrollments[0].id;
+  // Families can't enroll themselves, and strangers can't change a roster.
+  const selfEnroll = await json(
+    familyContext.request,
+    'POST',
+    `/api/public/families/${familyBToken}/enrollments`,
+    { childId: 'x', classId: art.id },
+  );
+  expect(selfEnroll.status).toBeGreaterThanOrEqual(400);
   expect(
     (
-      await json(
-        familyContext.request,
-        'DELETE',
-        `/api/public/families/${familyAToken}/enrollments/${benEnrollment}`,
-      )
+      await json(strangerContext.request, 'PUT', `/api/coops/${coop.id}/classes/${art.id}/roster`, {
+        childIds: [],
+      })
     ).status,
-  ).toBe(404);
+  ).toBe(403);
 
   await helperContext.close();
   await strangerContext.close();

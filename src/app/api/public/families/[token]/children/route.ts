@@ -1,12 +1,13 @@
-// A family adds another child while registration is open.
+// A family adds another child while registration is open. Coordinators place children in
+// classes; when the co-op places by age group, the child joins their age group's classes.
 import 'server-only';
 import { NextResponse } from 'next/server';
 import { readFamilyHome } from '@/lib/business/coop-views';
 import {
+  autoPlacementFor,
   coopIsActive,
   PAUSED_MESSAGE,
   placeChild,
-  registrableClassIds,
 } from '@/lib/business/families';
 import { familyByToken, linkNotFound } from '@/lib/business/public-access';
 import { guardOrigin, readBody, serverError } from '@/lib/business/route-helpers';
@@ -33,11 +34,8 @@ export async function POST(request: Request, context: RouteContext) {
   if (count >= 12) {
     return NextResponse.json({ error: 'A family can have up to 12 children.' }, { status: 409 });
   }
-  const allowed = await registrableClassIds(family.coopId);
-  if (body.data.classIds.some((id) => !allowed.has(id))) {
-    return NextResponse.json({ error: 'One of those classes isn’t offered.' }, { status: 400 });
-  }
   try {
+    const byAgeGroup = await autoPlacementFor(family.coopId);
     await prisma.$transaction(async (tx) => {
       const child = await tx.coopChild.create({
         data: {
@@ -47,7 +45,7 @@ export async function POST(request: Request, context: RouteContext) {
           ageGroup: body.data.ageGroup || null,
         },
       });
-      for (const classId of [...new Set(body.data.classIds)]) {
+      for (const classId of byAgeGroup(child.ageGroup)) {
         await placeChild(tx, family.coopId, child.id, classId);
       }
     });

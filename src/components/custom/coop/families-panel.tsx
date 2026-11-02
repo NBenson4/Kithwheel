@@ -1,16 +1,16 @@
-// Families tab: registration, class rosters with waitlists, and each family's details.
+// Families tab: registration, class placement, and each family's details.
 'use client';
 
 import { Download, Mail, Plus, Trash2, UserPlus } from 'lucide-react';
 import { type FormEvent, useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import styles from '@/components/custom/coop/coop.module.css';
+import { PlacementPanel, type RotationSummary } from '@/components/custom/coop/placement-panel';
 import { FamilyLinkCard } from '@/components/custom/coop/settings-panel';
 import { copyText, downloadCsv, errorMessage, post } from '@/components/custom/coop/shared';
 import base from '@/components/custom/scheduling/scheduling.module.css';
 import { apiFetch } from '@/lib/api-client';
 import {
-  type ClassRoster,
   CoopSettings,
   type CoopSettings as CoopSettingsType,
   FamilyOverview,
@@ -24,16 +24,10 @@ type Props = {
   onSettings: (settings: CoopSettingsType) => void;
 };
 
+type PanelProps = Props & { rotations: RotationSummary[] };
+
 type ChildDraft = { name: string; ageGroup: string; classIds: string[] };
 const emptyChild = (): ChildDraft => ({ name: '', ageGroup: '', classIds: [] });
-
-function seatsLabel(item: ClassRoster) {
-  const seats =
-    item.capacity === null
-      ? `${item.enrolled} enrolled`
-      : `${item.enrolled} of ${item.capacity} seats`;
-  return item.waitlisted ? `${seats} · ${item.waitlisted} waiting` : seats;
-}
 
 function RegistrationCard({ coopId, settings, onSettings }: Props) {
   const [note, setNote] = useState(settings.registrationNote ?? '');
@@ -68,10 +62,38 @@ function RegistrationCard({ coopId, settings, onSettings }: Props) {
       </div>
       <div className={styles.stack}>
         <p className={base.muted}>
-          When registration is open, the family link shows a sign-up form. Families choose classes
-          for each child from the published schedule; full classes go to a waitlist, and families
-          are emailed when a seat opens.
+          When registration is open, the family link shows a sign-up form. Families give each
+          child’s name and age group; coordinators decide which classes they’re in.
         </p>
+        <fieldset className={styles.stack} style={{ border: 0, margin: 0, padding: 0, gap: 8 }}>
+          <legend className={base.fieldLabel} style={{ marginBottom: 6 }}>
+            When a family registers
+          </legend>
+          <label className={styles.checkRow}>
+            <input
+              type="radio"
+              name="auto-place"
+              checked={settings.autoPlace}
+              disabled={saving}
+              onChange={() =>
+                void update({ autoPlace: true }, 'New children will join their age group’s classes')
+              }
+            />
+            Put each child in all of their age group’s classes (you can change it after)
+          </label>
+          <label className={styles.checkRow}>
+            <input
+              type="radio"
+              name="auto-place"
+              checked={!settings.autoPlace}
+              disabled={saving}
+              onChange={() =>
+                void update({ autoPlace: false }, 'New children will wait for you to place them')
+              }
+            />
+            Wait for a coordinator to place them
+          </label>
+        </fieldset>
         <div className={base.buttonRow}>
           <button
             className={settings.registrationOpen ? base.quietButton : base.button}
@@ -113,16 +135,50 @@ function RegistrationCard({ coopId, settings, onSettings }: Props) {
   );
 }
 
+export function AgeGroupSelect({
+  id,
+  value,
+  ageGroups,
+  onChange,
+  label = 'Age group',
+}: {
+  id: string;
+  value: string;
+  ageGroups: string[];
+  onChange: (value: string) => void;
+  label?: string;
+}) {
+  const options = value && !ageGroups.includes(value) ? [...ageGroups, value] : ageGroups;
+  return (
+    <label className={base.smallLabel} htmlFor={id}>
+      {label}
+      <select
+        id={id}
+        className={base.select}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+      >
+        <option value="">No age group</option>
+        {options.map((group) => (
+          <option key={group} value={group}>
+            {group}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
 function ChildFields({
   child,
   index,
-  classes,
+  ageGroups,
   onChange,
   onRemove,
 }: {
   child: ChildDraft;
   index: number;
-  classes: { id: string; name: string }[];
+  ageGroups: string[];
   onChange: (child: ChildDraft) => void;
   onRemove?: () => void;
 }) {
@@ -140,41 +196,13 @@ function ChildFields({
             onChange={(event) => onChange({ ...child, name: event.target.value })}
           />
         </label>
-        <label className={base.smallLabel} htmlFor={`child-age-${index}`}>
-          Age group (optional)
-          <input
-            id={`child-age-${index}`}
-            className={base.field}
-            value={child.ageGroup}
-            maxLength={80}
-            onChange={(event) => onChange({ ...child, ageGroup: event.target.value })}
-          />
-        </label>
+        <AgeGroupSelect
+          id={`child-age-${index}`}
+          value={child.ageGroup}
+          ageGroups={ageGroups}
+          onChange={(ageGroup) => onChange({ ...child, ageGroup })}
+        />
       </div>
-      {classes.length > 0 && (
-        <fieldset className={styles.stack} style={{ border: 0, margin: 0, padding: 0, gap: 6 }}>
-          <legend className={base.fieldLabel}>Classes</legend>
-          <div className={styles.grid2} style={{ gap: 6 }}>
-            {classes.map((item) => (
-              <label className={styles.checkRow} key={item.id}>
-                <input
-                  type="checkbox"
-                  checked={child.classIds.includes(item.id)}
-                  onChange={(event) =>
-                    onChange({
-                      ...child,
-                      classIds: event.target.checked
-                        ? [...child.classIds, item.id]
-                        : child.classIds.filter((id) => id !== item.id),
-                    })
-                  }
-                />
-                {item.name}
-              </label>
-            ))}
-          </div>
-        </fieldset>
-      )}
       {onRemove && (
         <div className={base.buttonRow}>
           <button className={styles.chipButton} type="button" onClick={onRemove}>
@@ -188,11 +216,11 @@ function ChildFields({
 
 function AddFamilyForm({
   coopId,
-  classes,
+  ageGroups,
   onDone,
 }: {
   coopId: string;
-  classes: { id: string; name: string }[];
+  ageGroups: string[];
   onDone: (overview: FamilyOverviewType) => void;
 }) {
   const [parentName, setParentName] = useState('');
@@ -262,7 +290,7 @@ function AddFamilyForm({
           key={index}
           child={child}
           index={index}
-          classes={classes}
+          ageGroups={ageGroups}
           onChange={(next) => setChildren(children.map((item, i) => (i === index ? next : item)))}
           onRemove={
             children.length > 1
@@ -302,11 +330,13 @@ function FamilyDetails({
   coopId,
   family,
   classes,
+  ageGroups,
   onOverview,
 }: {
   coopId: string;
   family: FamilyRecord;
   classes: { id: string; name: string }[];
+  ageGroups: string[];
   onOverview: (overview: FamilyOverviewType) => void;
 }) {
   const [editing, setEditing] = useState(false);
@@ -320,6 +350,7 @@ function FamilyDetails({
   const [addingChild, setAddingChild] = useState(false);
   const [newChild, setNewChild] = useState<ChildDraft>(emptyChild());
   const [pickClass, setPickClass] = useState<Record<string, string>>({});
+  const [removingChild, setRemovingChild] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   async function run(path: string, init: RequestInit, message: string) {
@@ -454,10 +485,58 @@ function FamilyDetails({
           const options = classes.filter((item) => !taken.has(item.id));
           return (
             <div className={styles.childCard} key={child.id}>
-              <span className={styles.rowTitle}>
-                {child.name}
-                {child.ageGroup ? <span className={base.muted}> · {child.ageGroup}</span> : null}
-              </span>
+              <div className={styles.row} style={{ padding: 0, border: 0, background: 'none' }}>
+                <span className={styles.rowTitle}>{child.name}</span>
+                <span className={styles.rowActions} style={{ alignItems: 'flex-end' }}>
+                  <AgeGroupSelect
+                    id={`age-${child.id}`}
+                    value={child.ageGroup ?? ''}
+                    ageGroups={ageGroups}
+                    onChange={(ageGroup) =>
+                      void run(
+                        `/api/coops/${coopId}/children/${child.id}`,
+                        post({ ageGroup: ageGroup || null, movePlacements: true }, 'PATCH'),
+                        ageGroup
+                          ? `${child.name} moved to ${ageGroup}, with that group’s classes`
+                          : `${child.name}’s age group cleared`,
+                      )
+                    }
+                  />
+                  {removingChild === child.id ? (
+                    <>
+                      <button
+                        className={base.dangerButtonSolid}
+                        type="button"
+                        disabled={busy}
+                        onClick={() =>
+                          void run(
+                            `/api/coops/${coopId}/children/${child.id}`,
+                            post({}, 'DELETE'),
+                            `${child.name} removed`,
+                          )
+                        }
+                      >
+                        Yes, remove {child.name}
+                      </button>
+                      <button
+                        className={styles.chipButton}
+                        type="button"
+                        onClick={() => setRemovingChild(null)}
+                      >
+                        Keep
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      className={styles.chipButton}
+                      type="button"
+                      onClick={() => setRemovingChild(child.id)}
+                    >
+                      Remove child
+                    </button>
+                  )}
+                </span>
+              </div>
               {child.enrollments.length ? (
                 <ul className={styles.list}>
                   {child.enrollments.map((entry) => (
@@ -560,7 +639,7 @@ function FamilyDetails({
               }
             }}
           >
-            <ChildFields child={newChild} index={99} classes={classes} onChange={setNewChild} />
+            <ChildFields child={newChild} index={99} ageGroups={ageGroups} onChange={setNewChild} />
             <div className={base.buttonRow}>
               <button className={base.button} type="submit" disabled={busy}>
                 Add child
@@ -660,7 +739,7 @@ export function LoadState({ error, onRetry }: { error: boolean; onRetry: () => v
   );
 }
 
-export function FamiliesPanel({ coopId, settings, onSettings }: Props) {
+export function FamiliesPanel({ coopId, settings, onSettings, rotations }: PanelProps) {
   const { overview, setOverview, error, reload } = useFamilyOverview(coopId);
   const [adding, setAdding] = useState(false);
   const [query, setQuery] = useState('');
@@ -668,6 +747,7 @@ export function FamiliesPanel({ coopId, settings, onSettings }: Props) {
   if (!overview) return <LoadState error={error} onRetry={() => void reload()} />;
 
   const classes = overview.classes.map((item) => ({ id: item.id, name: item.name }));
+  const ageGroups = [...new Set(rotations.map((rotation) => rotation.ageGroup))];
   const childCount = overview.families.reduce((sum, family) => sum + family.children.length, 0);
   const waiting = overview.classes.reduce((sum, item) => sum + item.waitlisted, 0);
   const search = query.trim().toLowerCase();
@@ -741,57 +821,13 @@ export function FamiliesPanel({ coopId, settings, onSettings }: Props) {
         <FamilyLinkCard coopId={coopId} settings={settings} onSettings={onSettings} />
       </div>
 
-      <section className={base.panel} aria-labelledby="rosters-heading">
-        <div className={base.panelHeader}>
-          <h2 className={base.panelTitle} id="rosters-heading">
-            Class rosters
-          </h2>
-          <span className={base.count}>{overview.classes.length}</span>
-        </div>
-        {overview.classes.length ? (
-          <div className={styles.stack} style={{ gap: 8 }}>
-            {overview.classes.map((item) => (
-              <details className={styles.details} key={item.id}>
-                <summary>
-                  <span className={styles.rowTitle}>{item.name}</span>
-                  <span
-                    className={`${styles.pill} ${item.capacity !== null && item.enrolled >= item.capacity ? styles.pillWarn : ''}`}
-                  >
-                    {seatsLabel(item)}
-                  </span>
-                </summary>
-                <div className={styles.detailsBody}>
-                  {item.roster.length ? (
-                    <ol className={styles.list}>
-                      {item.roster.map((entry) => (
-                        <li className={styles.row} key={entry.enrollmentId}>
-                          <span className={styles.rowMain}>
-                            <span className={styles.rowTitle}>{entry.childName}</span>
-                            <span className={styles.rowMeta}>{entry.familyName}</span>
-                          </span>
-                          <span
-                            className={`${styles.pill} ${entry.status === 'enrolled' ? styles.pillGood : styles.pillWarn}`}
-                          >
-                            {entry.status === 'enrolled' ? 'Enrolled' : 'Waitlist'}
-                          </span>
-                        </li>
-                      ))}
-                    </ol>
-                  ) : (
-                    <p className={base.muted}>No one has signed up yet.</p>
-                  )}
-                  <p className={base.muted}>
-                    Change capacity on the Schedule tab’s class library. Raising it moves waitlisted
-                    children in automatically.
-                  </p>
-                </div>
-              </details>
-            ))}
-          </div>
-        ) : (
-          <p className={base.muted}>Add classes on the Schedule tab first.</p>
-        )}
-      </section>
+      <PlacementPanel
+        coopId={coopId}
+        overview={overview}
+        onOverview={setOverview}
+        reload={reload}
+        rotations={rotations}
+      />
 
       <section className={base.panel} aria-labelledby="families-heading">
         <div className={base.panelHeader}>
@@ -820,7 +856,7 @@ export function FamiliesPanel({ coopId, settings, onSettings }: Props) {
           {adding && (
             <AddFamilyForm
               coopId={coopId}
-              classes={classes}
+              ageGroups={ageGroups}
               onDone={(next) => {
                 setOverview(next);
                 setAdding(false);
@@ -844,6 +880,7 @@ export function FamiliesPanel({ coopId, settings, onSettings }: Props) {
                 coopId={coopId}
                 family={family}
                 classes={classes}
+                ageGroups={ageGroups}
                 onOverview={setOverview}
               />
             ))

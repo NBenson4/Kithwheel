@@ -22,6 +22,7 @@ export const CoopSettings = z.object({
   shareUrl: z.string().nullable(),
   kioskUrl: z.string().nullable(),
   registrationOpen: z.boolean(),
+  autoPlace: z.boolean(),
   registrationNote: z.string().nullable(),
   timeZone: z.string(),
   meetingDay: z.number().int().min(0).max(6).nullable(),
@@ -44,6 +45,7 @@ export const CoopSettings = z.object({
 export const CoopSettingsUpdate = z
   .object({
     registrationOpen: z.boolean(),
+    autoPlace: z.boolean(),
     registrationNote: z.string().trim().max(1000, 'Note is too long').nullable(),
     timeZone: z.enum(TIME_ZONES),
     meetingDay: z.number().int().min(0).max(6).nullable(),
@@ -214,7 +216,8 @@ export const FamilyOverview = z.object({
 export const ChildInput = z.object({
   name: z.string().trim().min(1, 'Each child needs a name').max(120, 'Name is too long'),
   ageGroup: z.string().trim().max(80).optional(),
-  classIds: z.array(z.string().min(1).max(60)).max(40),
+  /** Only coordinators choose classes; families' choices are ignored. */
+  classIds: z.array(z.string().min(1).max(60)).max(40).default([]),
 });
 
 export const FamilyCreate = z.object({
@@ -243,6 +246,21 @@ export const FamilyUpdate = z
   .refine((value) => Object.keys(value).length > 0, 'No changes were provided');
 
 export const EnrollmentAdd = z.object({ childId: z.string().min(1), classId: z.string().min(1) });
+
+/** The exact set of children who should be enrolled in one class. */
+export const RosterSet = z.object({ childIds: z.array(z.string().min(1).max(60)).max(1000) });
+
+export const ChildUpdate = z
+  .object({
+    name: z.string().trim().min(1, 'Name is required').max(120, 'Name is too long'),
+    ageGroup: z.string().trim().max(80).nullable(),
+    /** When the age group changes, swap the old group's classes for the new group's. */
+    movePlacements: z.boolean(),
+  })
+  .partial()
+  .refine((value) => Object.keys(value).length > 0, 'No changes were provided');
+
+export const AutoPlaceResult = z.object({ placed: z.number().int(), waitlisted: z.number().int() });
 
 export const RegistrationResult = z.object({
   status: z.enum(['registered', 'already_registered']),

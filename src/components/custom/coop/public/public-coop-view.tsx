@@ -62,10 +62,6 @@ function RegistrationForm({
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
-    if (children.some((child) => !child.classIds.length)) {
-      setError('Choose at least one class for each child.');
-      return;
-    }
     setSubmitting(true);
     try {
       const result = await apiFetch(`/api/public/coops/${token}/register`, {
@@ -75,7 +71,7 @@ function RegistrationForm({
           phone,
           website,
           children: children.map((child) => ({
-            ...child,
+            name: child.name,
             ageGroup: child.ageGroup || (singleGroup ? ageGroups[0] : ''),
           })),
         }),
@@ -122,6 +118,11 @@ function RegistrationForm({
                 </ul>
               </div>
             )}
+            {!done.enrolled.length && !done.waitlisted.length && (
+              <p className={base.description}>
+                Your coordinators will place your children in classes and let you know.
+              </p>
+            )}
             <p className={base.description}>
               We emailed {email} a private link to your family page, with your classes, materials,
               fees and volunteer hours. If it doesn’t arrive in a few minutes, check spam.
@@ -129,8 +130,8 @@ function RegistrationForm({
           </>
         ) : (
           <p className={base.description}>
-            We emailed the link to your family page to {email} again. From there you can add classes
-            or another child.
+            We emailed the link to your family page to {email} again. From there you can see your
+            children’s classes or add another child.
           </p>
         )}
       </section>
@@ -239,7 +240,7 @@ function RegistrationForm({
                       value={child.ageGroup}
                       required
                       onChange={(event) =>
-                        updateChild(index, { ...child, ageGroup: event.target.value, classIds: [] })
+                        updateChild(index, { ...child, ageGroup: event.target.value })
                       }
                     >
                       <option value="">Choose…</option>
@@ -253,39 +254,13 @@ function RegistrationForm({
                 )}
               </div>
               {options.length > 0 ? (
-                <div className={styles.stack} style={{ gap: 6 }}>
-                  <span className={base.fieldLabel}>Classes</span>
-                  {options.map((item) => (
-                    <label className={styles.classOption} key={item.id}>
-                      <input
-                        type="checkbox"
-                        checked={child.classIds.includes(item.id)}
-                        onChange={(event) =>
-                          updateChild(index, {
-                            ...child,
-                            classIds: event.target.checked
-                              ? [...child.classIds, item.id]
-                              : child.classIds.filter((id) => id !== item.id),
-                          })
-                        }
-                      />
-                      <span className={styles.rowMain}>
-                        <span className={styles.rowTitle}>{item.name}</span>
-                        <span className={styles.rowMeta}>
-                          {[item.time, item.teacher].filter(Boolean).join(' · ')}
-                          {item.feeCents ? ` · ${formatMoney(item.feeCents)}` : ''}
-                          {item.capacity !== null
-                            ? item.seatsLeft
-                              ? ` · ${item.seatsLeft} left`
-                              : ' · Full, joins the waitlist'
-                            : ''}
-                        </span>
-                      </span>
-                    </label>
-                  ))}
-                </div>
+                <p className={base.muted} style={{ margin: 0 }}>
+                  {group} classes: {options.map((item) => item.name).join(', ')}
+                </p>
               ) : (
-                <p className={base.muted}>Choose an age group to see its classes.</p>
+                <p className={base.muted} style={{ margin: 0 }}>
+                  Choose an age group. Your coordinators place each child in classes.
+                </p>
               )}
               {children.length > 1 && (
                 <div className={base.buttonRow}>

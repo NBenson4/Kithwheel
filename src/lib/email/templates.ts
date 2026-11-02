@@ -161,6 +161,9 @@ export function familyWelcomeEmail(input: {
       ...(waitlisted.length
         ? ['Waitlisted (we’ll email you if a seat opens):', ...waitlisted]
         : []),
+      ...(!enrolled.length && !waitlisted.length
+        ? ['Your coordinators will place your children in classes and let you know.']
+        : []),
       'Your family page has the schedule, materials lists, announcements, fees and volunteer hours. Keep this link private; anyone with it can see your family’s page.',
     ],
     cta: { label: 'Open your family page', url: input.url },

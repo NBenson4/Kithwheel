@@ -28,14 +28,8 @@ export function FamilyHomeView({ token }: { token: string }) {
   const [home, setHome] = useState<FamilyHomeType | null>(null);
   const [failed, setFailed] = useState<'missing' | 'error' | null>(null);
   const [busy, setBusy] = useState(false);
-  const [dropping, setDropping] = useState<string | null>(null);
-  const [adding, setAdding] = useState<Record<string, string>>({});
   const [hours, setHours] = useState({ date: localToday(), hours: '', description: '' });
-  const [newChild, setNewChild] = useState<{
-    name: string;
-    ageGroup: string;
-    classIds: string[];
-  } | null>(null);
+  const [newChild, setNewChild] = useState<{ name: string; ageGroup: string } | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -88,11 +82,6 @@ export function FamilyHomeView({ token }: { token: string }) {
     );
   }
 
-  const scheduleClasses = new Map(
-    (home.schedule?.rotations ?? []).flatMap((rotation) =>
-      rotation.classes.map((item) => [item.id, item] as const),
-    ),
-  );
   const ageGroups = home.schedule?.rotations.map((rotation) => rotation.ageGroup) ?? [];
   const { volunteer, fees } = home;
   const percent = volunteer.requiredMinutes
@@ -114,111 +103,43 @@ export function FamilyHomeView({ token }: { token: string }) {
         <h2 className={styles.sectionTitle} id="children-heading">
           Your children’s classes
         </h2>
-        {home.children.map((child) => {
-          const taken = new Set(child.enrollments.map((entry) => entry.classId));
-          const options = [...scheduleClasses.values()].filter((item) => !taken.has(item.id));
-          return (
-            <div className={styles.childCard} key={child.id}>
-              <span className={styles.rowTitle}>
-                {child.name}
-                {child.ageGroup ? <span className={base.muted}> · {child.ageGroup}</span> : null}
-              </span>
-              {child.enrollments.length ? (
-                <div className={styles.stack} style={{ gap: 8 }}>
-                  {child.enrollments.map((entry) => (
-                    <ClassCard
-                      key={entry.id}
-                      item={entry.class}
-                      extra={
+        <p className={base.muted} style={{ margin: 0 }}>
+          Your co-op’s coordinators place children in classes. For changes, reply to any email from
+          your co-op.
+        </p>
+        {home.children.map((child) => (
+          <div className={styles.childCard} key={child.id}>
+            <span className={styles.rowTitle}>
+              {child.name}
+              {child.ageGroup ? <span className={base.muted}> · {child.ageGroup}</span> : null}
+            </span>
+            {child.enrollments.length ? (
+              <div className={styles.stack} style={{ gap: 8 }}>
+                {child.enrollments.map((entry) => (
+                  <ClassCard
+                    key={entry.id}
+                    item={entry.class}
+                    extra={
+                      <span className={base.buttonRow} style={{ marginTop: 4 }}>
                         <span
-                          className={`${base.buttonRow} ${styles.noPrint}`}
-                          style={{ marginTop: 4 }}
+                          className={`${styles.pill} ${entry.status === 'enrolled' ? styles.pillGood : styles.pillWarn}`}
                         >
-                          <span
-                            className={`${styles.pill} ${entry.status === 'enrolled' ? styles.pillGood : styles.pillWarn}`}
-                          >
-                            {entry.status === 'enrolled'
-                              ? 'Enrolled'
-                              : `Waitlist${entry.waitlistPosition ? ` #${entry.waitlistPosition}` : ''}`}
-                          </span>
-                          {dropping === entry.id ? (
-                            <>
-                              <button
-                                className={styles.chipButton}
-                                type="button"
-                                disabled={busy}
-                                onClick={async () => {
-                                  await run(
-                                    `/api/public/families/${token}/enrollments/${entry.id}`,
-                                    post({}, 'DELETE'),
-                                    `${child.name} dropped ${entry.class.name}`,
-                                  );
-                                  setDropping(null);
-                                }}
-                              >
-                                Yes, drop it
-                              </button>
-                              <button
-                                className={styles.chipButton}
-                                type="button"
-                                onClick={() => setDropping(null)}
-                              >
-                                Keep
-                              </button>
-                            </>
-                          ) : (
-                            <button
-                              className={styles.chipButton}
-                              type="button"
-                              onClick={() => setDropping(entry.id)}
-                            >
-                              {entry.status === 'enrolled' ? 'Drop class' : 'Leave waitlist'}
-                            </button>
-                          )}
+                          {entry.status === 'enrolled'
+                            ? 'Enrolled'
+                            : `Waitlist${entry.waitlistPosition ? ` #${entry.waitlistPosition}` : ''}`}
                         </span>
-                      }
-                    />
-                  ))}
-                </div>
-              ) : (
-                <p className={base.muted}>No classes yet.</p>
-              )}
-              {home.registrationOpen && options.length > 0 && (
-                <div className={`${base.buttonRow} ${styles.noPrint}`}>
-                  <select
-                    className={base.select}
-                    aria-label={`Add a class for ${child.name}`}
-                    value={adding[child.id] ?? ''}
-                    onChange={(event) => setAdding({ ...adding, [child.id]: event.target.value })}
-                  >
-                    <option value="">Add a class…</option>
-                    {options.map((item) => (
-                      <option key={item.id} value={item.id}>
-                        {item.name}
-                        {item.capacity !== null && !item.seatsLeft ? ' (waitlist)' : ''}
-                      </option>
-                    ))}
-                  </select>
-                  <button
-                    className={base.quietButton}
-                    type="button"
-                    disabled={busy || !adding[child.id]}
-                    onClick={async () => {
-                      const ok = await run(
-                        `/api/public/families/${token}/enrollments`,
-                        post({ childId: child.id, classId: adding[child.id] }),
-                        'Class added',
-                      );
-                      if (ok) setAdding({ ...adding, [child.id]: '' });
-                    }}
-                  >
-                    Add
-                  </button>
-                </div>
-              )}
-            </div>
-          );
-        })}
+                      </span>
+                    }
+                  />
+                ))}
+              </div>
+            ) : (
+              <p className={base.muted}>
+                Not placed in classes yet. Your coordinators will let you know.
+              </p>
+            )}
+          </div>
+        ))}
         {home.registrationOpen && home.schedule && (
           <div className={styles.noPrint}>
             {newChild ? (
@@ -251,7 +172,7 @@ export function FamilyHomeView({ token }: { token: string }) {
                       className={base.select}
                       value={newChild.ageGroup}
                       onChange={(event) =>
-                        setNewChild({ ...newChild, ageGroup: event.target.value, classIds: [] })
+                        setNewChild({ ...newChild, ageGroup: event.target.value })
                       }
                     >
                       <option value="">Choose…</option>
@@ -261,27 +182,6 @@ export function FamilyHomeView({ token }: { token: string }) {
                     </select>
                   </label>
                 </div>
-                {(
-                  home.schedule.rotations.find(
-                    (rotation) => rotation.ageGroup === newChild.ageGroup,
-                  )?.classes ?? []
-                ).map((item) => (
-                  <label className={styles.classOption} key={item.id}>
-                    <input
-                      type="checkbox"
-                      checked={newChild.classIds.includes(item.id)}
-                      onChange={(event) =>
-                        setNewChild({
-                          ...newChild,
-                          classIds: event.target.checked
-                            ? [...newChild.classIds, item.id]
-                            : newChild.classIds.filter((id) => id !== item.id),
-                        })
-                      }
-                    />
-                    <span className={styles.rowTitle}>{item.name}</span>
-                  </label>
-                ))}
                 <div className={base.buttonRow}>
                   <button className={base.button} type="submit" disabled={busy}>
                     Add child
@@ -299,7 +199,7 @@ export function FamilyHomeView({ token }: { token: string }) {
               <button
                 className={base.quietButton}
                 type="button"
-                onClick={() => setNewChild({ name: '', ageGroup: '', classIds: [] })}
+                onClick={() => setNewChild({ name: '', ageGroup: '' })}
               >
                 Add another child
               </button>

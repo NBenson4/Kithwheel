@@ -29,7 +29,7 @@ export async function POST(request: Request, context: RouteContext) {
   if (!body.ok) return body.response;
 
   try {
-    const outcome = await registerFamily(coopId, body.data, { allowAnyClass: true });
+    const outcome = await registerFamily(coopId, body.data, { source: 'coordinator' });
     if (outcome.status === 'already_registered') {
       return NextResponse.json(
         { error: `A family with ${body.data.email} is already registered.` },
