@@ -638,3 +638,66 @@
     transition: none;
   }
 }
+
+.dangerButton,
+.dangerButtonSolid {
+  display: inline-flex;
+  min-height: 40px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 9px 13px;
+  border: 1px solid #e3c2b1;
+  border-radius: 7px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.dangerButton {
+  margin-left: auto;
+  color: #9a4a2b;
+  background: transparent;
+}
+
+.dangerButton:hover:not(:disabled) {
+  background: #f8ebe3;
+}
+
+.dangerButtonSolid {
+  border-color: #9a4a2b;
+  color: #fff;
+  background: #9a4a2b;
+}
+
+.dangerButtonSolid:hover:not(:disabled) {
+  background: #82391f;
+}
+
+.dangerButton:focus-visible,
+.dangerButtonSolid:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+.dangerButtonSolid:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.confirmBox {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #e3c2b1;
+  border-radius: 8px;
+  background: #fbf3ee;
+}
+
+.confirmText {
+  margin: 0;
+  color: var(--foreground);
+  font-size: 13px;
+  line-height: 1.5;
+}

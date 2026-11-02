@@ -1,7 +1,7 @@
 // Kithwheel's co-op schedule desk.
 'use client';
 
-import { CalendarDays, Plus, School } from 'lucide-react';
+import { CalendarDays, Plus, School, Trash2 } from 'lucide-react';
 import { type FormEvent, useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { BillingPanel } from '@/components/custom/billing/billing-panel';
@@ -15,6 +15,7 @@ import {
   CoopClassRecord,
   CoopList,
   CoopRecord,
+  DeletedRecord,
   ScheduleList,
   type ScheduleRecord,
 } from '@/lib/contracts/coops';
@@ -64,6 +65,8 @@ export function CoordinatorWorkspace() {
   const [classFormOpen, setClassFormOpen] = useState(false);
   const [classDraft, setClassDraft] = useState<ClassDraft>(emptyClass);
   const [editingClassId, setEditingClassId] = useState<string | null>(null);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const loadCoops = useCallback(async () => {
     setLoading(true);
@@ -166,6 +169,7 @@ export function CoordinatorWorkspace() {
   }
 
   function startClassEdit(item: CoopClass) {
+    setConfirmingDelete(false);
     setEditingClassId(item.id);
     setClassDraft({
       name: item.name,
@@ -198,6 +202,40 @@ export function CoordinatorWorkspace() {
       toast.error(errorMessage(error));
     }
   }
+
+  async function deleteClass() {
+    if (!coopId || !editingClassId) return;
+    const name = classes.find((item) => item.id === editingClassId)?.name ?? 'Class';
+    setDeleting(true);
+    try {
+      await apiFetch(`/api/coops/${coopId}/classes/${editingClassId}`, {
+        method: 'DELETE',
+        body: JSON.stringify({}),
+        schema: DeletedRecord,
+      });
+      setClassDraft(emptyClass);
+      setClassFormOpen(false);
+      setEditingClassId(null);
+      setConfirmingDelete(false);
+      await refreshCurrentCoop();
+      toast.success(`${name} deleted`);
+    } catch (error) {
+      setConfirmingDelete(false);
+      toast.error(errorMessage(error));
+    } finally {
+      setDeleting(false);
+    }
+  }
+
+  const draftsUsingEditingClass = editingClassId
+    ? schedules.filter(
+        (schedule) =>
+          schedule.status !== 'published' &&
+          schedule.rotations.some((rotation) =>
+            rotation.entries.some((entry) => entry.class.id === editingClassId),
+          ),
+      ).length
+    : 0;
 
   const currentSchedule = schedules.find((schedule) => schedule.id === currentScheduleId) ?? null;
   const selectedSchedule = schedules.find((schedule) => schedule.id === selectedScheduleId) ?? null;
@@ -452,6 +490,7 @@ export function CoordinatorWorkspace() {
                     className={`${styles.quietButton} ${styles.addClassButton}`}
                     onClick={() => {
                       setEditingClassId(null);
+                      setConfirmingDelete(false);
                       setClassDraft(emptyClass);
                       setClassFormOpen((open) => !open);
                     }}
@@ -533,12 +572,49 @@ export function CoordinatorWorkspace() {
                           onClick={() => {
                             setClassFormOpen(false);
                             setEditingClassId(null);
+                            setConfirmingDelete(false);
                             setClassDraft(emptyClass);
                           }}
                         >
                           Cancel
                         </button>
+                        {editingClassId && !confirmingDelete && (
+                          <button
+                            className={styles.dangerButton}
+                            type="button"
+                            onClick={() => setConfirmingDelete(true)}
+                          >
+                            <Trash2 aria-hidden="true" size={14} /> Delete class
+                          </button>
+                        )}
                       </div>
+                      {editingClassId && confirmingDelete && (
+                        <div className={styles.confirmBox} role="alert">
+                          <p className={styles.confirmText}>
+                            Delete “{classDraft.name || 'this class'}”? This can’t be undone.
+                            {draftsUsingEditingClass > 0 &&
+                              ` It will also be removed from ${draftsUsingEditingClass} unpublished ${draftsUsingEditingClass === 1 ? 'schedule' : 'schedules'}.`}
+                          </p>
+                          <div className={styles.buttonRow}>
+                            <button
+                              className={styles.dangerButtonSolid}
+                              type="button"
+                              disabled={deleting}
+                              onClick={() => void deleteClass()}
+                            >
+                              {deleting ? 'Deleting…' : 'Yes, delete class'}
+                            </button>
+                            <button
+                              className={styles.quietButton}
+                              type="button"
+                              disabled={deleting}
+                              onClick={() => setConfirmingDelete(false)}
+                            >
+                              Keep it
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </form>
                   )}
                 </section>

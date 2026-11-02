@@ -24,6 +24,8 @@ export const CoopClassRecord = z.object({
 
 export const CoopClassList = z.object({ items: z.array(CoopClassRecord) });
 
+export const DeletedRecord = z.object({ id: z.string() });
+
 export const CoopClassCreate = z.object({
   name: z.string().trim().min(1, 'Class name is required').max(120, 'Class name is too long'),
   description: z.string().trim().max(500, 'Description is too long').optional(),

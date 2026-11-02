@@ -21,9 +21,27 @@ export async function PATCH(request: Request, context: RouteContext) {
       return NextResponse.json({ errors: parsed.error.flatten().fieldErrors }, { status: 400 });
     const schedule = await prisma.coopSchedule.findFirst({
       where: { id: scheduleId, coopId },
-      select: { id: true },
+      select: { id: true, status: true },
     });
     if (!schedule) return NextResponse.json({ error: 'schedule_not_found' }, { status: 404 });
+
+    // A published schedule stays published (and current) while it is edited, so
+    // families never lose it over a small fix. It must stay complete, though.
+    const isPublished = schedule.status === 'PUBLISHED';
+    if (
+      isPublished &&
+      parsed.data.rotations &&
+      (parsed.data.rotations.length === 0 ||
+        parsed.data.rotations.some((rotation) => rotation.classIds.length === 0))
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            'A published schedule needs at least one age group, and a class in every age group. Withdraw it first to make that change.',
+        },
+        { status: 409 },
+      );
+    }
 
     if (parsed.data.rotations) {
       const classIds = parsed.data.rotations.flatMap((rotation) => rotation.classIds);
@@ -41,17 +59,18 @@ export async function PATCH(request: Request, context: RouteContext) {
     }
 
     await prisma.$transaction(async (tx) => {
-      await tx.coop.updateMany({
-        where: { id: coopId, currentScheduleId: scheduleId },
-        data: { currentScheduleId: null },
-      });
+      // Editing any other schedule turns it back into a draft that is not current.
+      if (!isPublished) {
+        await tx.coop.updateMany({
+          where: { id: coopId, currentScheduleId: scheduleId },
+          data: { currentScheduleId: null },
+        });
+      }
       await tx.coopSchedule.update({
         where: { id: scheduleId },
         data: {
           ...(parsed.data.title !== undefined ? { title: parsed.data.title } : {}),
-          status: 'DRAFT',
-          publishedAt: null,
-          withdrawnAt: null,
+          ...(isPublished ? {} : { status: 'DRAFT', publishedAt: null, withdrawnAt: null }),
           ...(parsed.data.rotations
             ? {
                 rotations: {

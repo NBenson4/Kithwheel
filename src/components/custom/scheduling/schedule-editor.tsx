@@ -136,7 +136,11 @@ export function ScheduleEditor({ coopId, schedule, classes, onRefresh }: Schedul
       });
       setEditing(false);
       await onRefresh();
-      toast.success('Saved arrangement. Review the latest version below.');
+      toast.success(
+        schedule?.status === 'published'
+          ? 'Changes saved. The published schedule is updated for families.'
+          : 'Saved arrangement. Review the latest version below.',
+      );
     } catch (error) {
       toast.error(messageFrom(error));
     } finally {
@@ -229,6 +233,11 @@ export function ScheduleEditor({ coopId, schedule, classes, onRefresh }: Schedul
 
       {editing ? (
         <form className={styles.editor} onSubmit={save}>
+          {schedule.status === 'published' && (
+            <p className={styles.muted} role="note">
+              This schedule is published. Your changes go live for families as soon as you save.
+            </p>
+          )}
           <label className={styles.smallLabel} htmlFor="edit-schedule-title">
             Schedule name
             <input
