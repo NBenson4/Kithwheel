@@ -1,0 +1,149 @@
+.page {
+  display: grid;
+  min-height: 100dvh;
+  align-content: center;
+  justify-items: center;
+  gap: 28px;
+  padding: 34px 20px 52px;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: "Inter Tight", ui-sans-serif, system-ui, sans-serif;
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--foreground);
+  font-size: 18px;
+  font-weight: 650;
+  letter-spacing: -0.05em;
+  text-decoration: none;
+}
+
+.mark {
+  position: relative;
+  display: inline-block;
+  width: 25px;
+  height: 25px;
+  flex: 0 0 auto;
+}
+
+.mark i {
+  position: absolute;
+  width: 9px;
+  height: 9px;
+  border-radius: 3px 3px 3px 0;
+  background: #315b46;
+  transform: rotate(45deg);
+}
+
+.mark i:first-child {
+  top: 1px;
+  left: 8px;
+}
+.mark i:nth-child(2) {
+  top: 8px;
+  right: 1px;
+  background: #bd6849;
+}
+.mark i:nth-child(3) {
+  bottom: 1px;
+  left: 8px;
+  background: #c49c44;
+}
+.mark i:nth-child(4) {
+  top: 8px;
+  left: 1px;
+  background: #6f8c69;
+}
+
+.mark b {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 1;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--card);
+}
+
+.card {
+  width: min(100%, 440px);
+  padding: clamp(23px, 5vw, 38px);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--card);
+  box-shadow: 0 18px 50px rgb(35 57 47 / 0.08);
+}
+
+.eyebrow {
+  margin: 0 0 9px;
+  color: var(--muted-foreground);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+.title {
+  margin: 0;
+  color: var(--foreground);
+  font-size: clamp(27px, 5vw, 34px);
+  font-weight: 500;
+  letter-spacing: -0.06em;
+  line-height: 1.1;
+}
+
+.description {
+  margin: 9px 0 24px;
+  color: var(--muted-foreground);
+  font-family: "EB Garamond", Georgia, serif;
+  font-size: 17px;
+  line-height: 1.55;
+}
+
+.note {
+  margin: 16px 0 0;
+  padding: 12px 14px;
+  border-radius: 12px;
+  color: #315b46;
+  background: #d9e2d1;
+  font-family: "EB Garamond", Georgia, serif;
+  font-size: 15px;
+  line-height: 1.45;
+}
+
+.switch {
+  margin: 19px 0 0;
+  color: var(--muted-foreground);
+  font-size: 13px;
+  text-align: center;
+}
+
+.switch a,
+.back {
+  color: var(--primary);
+  font-weight: 650;
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  text-underline-offset: 3px;
+}
+
+.switch a:hover,
+.back:hover {
+  text-decoration-color: currentColor;
+}
+
+.back {
+  color: var(--muted-foreground);
+  font-size: 13px;
+  text-decoration: none;
+}
+
+@media (max-width: 380px) {
+  .page {
+    padding-inline: 14px;
+  }
+}
