@@ -3,6 +3,7 @@ import 'server-only';
 import { headers } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
+import { trialEndFrom } from '@/lib/billing/entitlement';
 import { CoopCreate, CoopList, CoopRecord } from '@/lib/contracts/coops';
 import { prisma } from '@/lib/db';
 import { sameOrigin } from '@/lib/same-origin';
@@ -35,6 +36,7 @@ export async function POST(request: Request) {
       data: {
         name: parsed.data.name,
         createdByUserId: session.user.id,
+        trialEndsAt: trialEndFrom(new Date()),
         memberships: { create: { userId: session.user.id, role: 'coordinator' } },
       },
       select: { id: true, name: true },

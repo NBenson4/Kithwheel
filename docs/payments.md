@@ -4,7 +4,45 @@ Generated with Stripe's implementation planner (guide `iguide_61VgZ2fWZf0cZP1R94
 sandbox `acct_1UWtmBQnOBOChu75`) and checked against Stripe's docs. Kithwheel has two
 separate money flows. Build Flow 1 first.
 
-## Core model: one Stripe Account per co-op (Accounts v2)
+## Status
+
+- **Flow 1 is built** (see "Flow 1 as implemented" below) and verified end to end
+  against the sandbox with `tests/manual/billing-sandbox.mjs`.
+- **Flow 2 is not started.** It depends on family accounts and registration.
+
+## Flow 1 as implemented
+
+- **Free trial (30 days, no card) is tracked in the app**, not in Stripe:
+  `Coop.trialEndsAt` is set when a co-op is created. Stripe objects exist only for
+  co-ops that subscribe.
+- **Subscribe:** `POST /api/coops/:id/billing/checkout` creates one Stripe Customer per
+  co-op (idempotent) and a hosted Checkout Session (`mode: subscription`, flexible
+  billing mode, promotion codes allowed). Remaining trial time is passed as
+  `subscription_data.trial_end` (when 48+ hours remain), so subscribing early is free
+  until the trial would have ended.
+- **Return from Checkout:** the workspace calls `POST /api/coops/:id/billing/confirm`
+  with the session id, which syncs the subscription immediately (no webhook race).
+- **Webhook:** `POST /api/stripe/webhook` (checkout.session.completed,
+  customer.subscription.*, invoice.paid, invoice.payment_failed). Every event re-reads
+  the subscription from Stripe; processed event ids are stored in `StripeEvent`.
+  A failed payment emails the coordinator.
+- **Access:** `requireCoopEditor` guards every route that changes co-op records. Editing
+  needs an active trial or a subscription that is `active`, `trialing`, or `past_due`
+  (grace while Stripe retries). Otherwise those routes answer 402 `billing_required`;
+  reading always works. Rules live in `src/lib/billing/entitlement.ts` (unit tested).
+- **Manage billing:** `POST /api/coops/:id/billing/portal` opens the Customer Portal
+  configuration created by `npm run stripe:setup` (switch monthly/annual, card,
+  invoices, cancel at period end).
+- **Catalog:** `npm run stripe:setup` creates/updates product `kithwheel`
+  (tax code `txcd_10103001`) and prices `kithwheel_monthly` ($60) and
+  `kithwheel_annual` ($600), exclusive of tax. Run it once per environment.
+- **Tax:** `STRIPE_AUTOMATIC_TAX=true` turns on `automatic_tax` and billing-address
+  collection in Checkout. Leave it off until Stripe Tax has a head office and a registration.
+- **Customers v1 for now:** the sandbox does not have Accounts v2 enabled (Connect not
+  set up), so co-ops are billed as v1 Customers. That is fully supported and can stay
+  as is when Flow 2 adds connected accounts.
+
+## Target model for Flow 2: one Stripe Account per co-op (Accounts v2)
 
 Each co-op maps to one Accounts v2 `Account` (`acct_...`), stored on `Coop.stripeAccountId`.
 Configurations are added as the co-op needs them:
@@ -75,8 +113,10 @@ Every handler verifies the signature with its own signing secret and is idempote
 ## Environment variables
 
 - `STRIPE_SECRET_KEY` (server only, `sk_test_...` until launch)
-- `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` (`pk_test_...`)
-- `STRIPE_WEBHOOK_SECRET`, `STRIPE_CONNECT_WEBHOOK_SECRET`, `STRIPE_V2_WEBHOOK_SECRET`
+- `STRIPE_WEBHOOK_SECRET` (Flow 1 endpoint)
+- `STRIPE_AUTOMATIC_TAX` (`false` until tax registrations exist)
+- Flow 2 later: `STRIPE_CONNECT_WEBHOOK_SECRET`, `STRIPE_V2_WEBHOOK_SECRET`,
+  `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` (for embedded Connect components)
 
 ## Dashboard setup (sandbox first, then live)
 
@@ -86,8 +126,8 @@ Every handler verifies the signature with its own signing secret and is idempote
 4. Branding: Kithwheel logo and colors (applies to Checkout, invoices, Portal).
 5. Payment methods: cards and ACH Direct Debit / bank transfer for invoices.
 
-## Open decisions
+## Decisions
 
-- Prices: monthly amount and annual amount (e.g., two months free).
-- Free trial: none, or N days with card on file.
-- Platform fee on family payments: none, flat, or percentage.
+- Prices: $60/month, $600/year.
+- Free trial: 30 days, no card required.
+- Platform fee on family payments: none at launch.

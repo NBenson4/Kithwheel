@@ -1,7 +1,7 @@
 // Publish one complete schedule as the co-op's current plan.
 import 'server-only';
 import { NextResponse } from 'next/server';
-import { requireCoopCoordinator } from '@/lib/business/coordinator-auth';
+import { requireCoopEditor } from '@/lib/business/coordinator-auth';
 import { readScheduleList } from '@/lib/business/schedule-data';
 import { prisma } from '@/lib/db';
 import { sameOrigin } from '@/lib/same-origin';
@@ -11,7 +11,7 @@ type RouteContext = { params: Promise<{ coopId: string; scheduleId: string }> };
 export async function POST(request: Request, context: RouteContext) {
   if (!sameOrigin(request)) return NextResponse.json({ error: 'forbidden' }, { status: 403 });
   const { coopId, scheduleId } = await context.params;
-  const access = await requireCoopCoordinator(coopId);
+  const access = await requireCoopEditor(coopId);
   if (!access.ok) return access.response;
 
   const schedule = await prisma.coopSchedule.findFirst({

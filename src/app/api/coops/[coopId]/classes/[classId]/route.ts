@@ -1,7 +1,7 @@
 // Edit class records only inside their coordinator's co-op.
 import 'server-only';
 import { NextResponse } from 'next/server';
-import { requireCoopCoordinator } from '@/lib/business/coordinator-auth';
+import { requireCoopEditor } from '@/lib/business/coordinator-auth';
 import { CoopClassList, CoopClassUpdate } from '@/lib/contracts/coops';
 import { prisma } from '@/lib/db';
 import { sameOrigin } from '@/lib/same-origin';
@@ -11,7 +11,7 @@ type RouteContext = { params: Promise<{ coopId: string; classId: string }> };
 export async function PATCH(request: Request, context: RouteContext) {
   if (!sameOrigin(request)) return NextResponse.json({ error: 'forbidden' }, { status: 403 });
   const { coopId, classId } = await context.params;
-  const access = await requireCoopCoordinator(coopId);
+  const access = await requireCoopEditor(coopId);
   if (!access.ok) return access.response;
 
   try {

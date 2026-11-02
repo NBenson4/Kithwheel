@@ -1,14 +1,24 @@
 // Co-op records and coordinator-managed schedules.
 model Coop {
-  id                String           @id @default(cuid())
-  name              String
-  createdByUserId   String
-  currentScheduleId String?
-  createdAt         DateTime         @default(now())
-  updatedAt         DateTime         @updatedAt
-  memberships       CoopMembership[]
-  classes           CoopClass[]
-  schedules         CoopSchedule[]
+  id                   String           @id @default(cuid())
+  name                 String
+  createdByUserId      String
+  currentScheduleId    String?
+  // Billing. The free trial is tracked here; Stripe is only involved once a co-op subscribes.
+  trialEndsAt          DateTime         @default(dbgenerated("(now() + '30 days'::interval)"))
+  stripeCustomerId     String?          @unique
+  stripeSubscriptionId String?          @unique
+  // Stripe subscription status (active, trialing, past_due, canceled, unpaid, ...).
+  subscriptionStatus   String?
+  // Billing interval of the subscribed price: "month" or "year".
+  subscriptionInterval String?
+  currentPeriodEnd     DateTime?
+  cancelAtPeriodEnd    Boolean          @default(false)
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
+  memberships          CoopMembership[]
+  classes              CoopClass[]
+  schedules            CoopSchedule[]
 }
 
 model CoopMembership {
@@ -24,31 +34,31 @@ model CoopMembership {
 }
 
 model CoopClass {
-  id          String              @id @default(cuid())
-  coopId      String
-  name        String
-  description String?
-  teacher     String?
-  room        String?
-  time        String?
-  createdAt   DateTime            @default(now())
-  updatedAt   DateTime            @updatedAt
-  coop        Coop                @relation(fields: [coopId], references: [id], onDelete: Cascade)
+  id              String              @id @default(cuid())
+  coopId          String
+  name            String
+  description     String?
+  teacher         String?
+  room            String?
+  time            String?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  coop            Coop                @relation(fields: [coopId], references: [id], onDelete: Cascade)
   scheduleEntries CoopScheduleEntry[]
 
   @@index([coopId, name])
 }
 
 model CoopSchedule {
-  id          String             @id @default(cuid())
+  id          String                 @id @default(cuid())
   coopId      String
   title       String
-  status      CoopScheduleStatus @default(DRAFT)
+  status      CoopScheduleStatus     @default(DRAFT)
   publishedAt DateTime?
   withdrawnAt DateTime?
-  createdAt   DateTime           @default(now())
-  updatedAt   DateTime           @updatedAt
-  coop        Coop               @relation(fields: [coopId], references: [id], onDelete: Cascade)
+  createdAt   DateTime               @default(now())
+  updatedAt   DateTime               @updatedAt
+  coop        Coop                   @relation(fields: [coopId], references: [id], onDelete: Cascade)
   rotations   CoopScheduleRotation[]
 
   @@index([coopId, status, updatedAt])
@@ -66,12 +76,12 @@ model CoopScheduleRotation {
 }
 
 model CoopScheduleEntry {
-  id         String              @id @default(cuid())
+  id         String               @id @default(cuid())
   rotationId String
   classId    String
   position   Int
   rotation   CoopScheduleRotation @relation(fields: [rotationId], references: [id], onDelete: Cascade)
-  class      CoopClass           @relation(fields: [classId], references: [id], onDelete: Cascade)
+  class      CoopClass            @relation(fields: [classId], references: [id], onDelete: Cascade)
 
   @@unique([rotationId, position])
   @@unique([rotationId, classId])
@@ -83,4 +93,11 @@ enum CoopScheduleStatus {
   PUBLISHED
   WITHDRAWN
   ARCHIVED
+}
+
+// Stripe webhook events already handled, so retried deliveries are skipped.
+model StripeEvent {
+  id          String   @id
+  type        String
+  processedAt DateTime @default(now())
 }

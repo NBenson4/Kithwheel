@@ -1,7 +1,7 @@
 // Update a schedule's title and ordered rotations.
 import 'server-only';
 import { NextResponse } from 'next/server';
-import { requireCoopCoordinator } from '@/lib/business/coordinator-auth';
+import { requireCoopEditor } from '@/lib/business/coordinator-auth';
 import { readScheduleList } from '@/lib/business/schedule-data';
 import { ScheduleList, ScheduleUpdate } from '@/lib/contracts/coops';
 import { prisma } from '@/lib/db';
@@ -12,7 +12,7 @@ type RouteContext = { params: Promise<{ coopId: string; scheduleId: string }> };
 export async function PATCH(request: Request, context: RouteContext) {
   if (!sameOrigin(request)) return NextResponse.json({ error: 'forbidden' }, { status: 403 });
   const { coopId, scheduleId } = await context.params;
-  const access = await requireCoopCoordinator(coopId);
+  const access = await requireCoopEditor(coopId);
   if (!access.ok) return access.response;
 
   try {

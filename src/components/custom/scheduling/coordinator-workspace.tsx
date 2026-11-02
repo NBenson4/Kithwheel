@@ -4,6 +4,7 @@
 import { CalendarDays, Plus, School } from 'lucide-react';
 import { type FormEvent, useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
+import { BillingPanel } from '@/components/custom/billing/billing-panel';
 import { ScheduleEditor } from '@/components/custom/scheduling/schedule-editor';
 import styles from '@/components/custom/scheduling/scheduling.module.css';
 import { apiFetch } from '@/lib/api-client';
@@ -70,9 +71,14 @@ export function CoordinatorWorkspace() {
     try {
       const result = await apiFetch('/api/coops', { schema: CoopList });
       setCoops(result.items);
-      setCoopId((current) =>
-        result.items.some((coop) => coop.id === current) ? current : (result.items[0]?.id ?? ''),
-      );
+      // A ?coop= marker (returning from Stripe) selects that co-op.
+      const requested = new URL(window.location.href).searchParams.get('coop');
+      setCoopId((current) => {
+        if (requested && result.items.some((coop) => coop.id === requested)) return requested;
+        return result.items.some((coop) => coop.id === current)
+          ? current
+          : (result.items[0]?.id ?? '');
+      });
     } catch {
       setLoadError(true);
     } finally {
@@ -325,6 +331,9 @@ export function CoordinatorWorkspace() {
               )}
             </div>
           </section>
+
+          {/* Hidden while the co-op's records can't load; the error below has its own retry. */}
+          {coopId && !coopDataError && <BillingPanel key={coopId} coopId={coopId} />}
 
           {loadingCoopData ? (
             <output className={styles.loading} aria-live="polite">

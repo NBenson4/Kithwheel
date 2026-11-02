@@ -102,7 +102,26 @@ export const ScheduleUpdate = z
     'No schedule changes were provided',
   );
 
+export const BillingStatus = z.object({
+  state: z.enum(['trial', 'trial_expired', 'subscribed', 'past_due', 'inactive']),
+  canEdit: z.boolean(),
+  trialEndsAt: z.string(),
+  trialDaysLeft: z.number().int().nonnegative(),
+  plan: z.enum(['month', 'year']).nullable(),
+  currentPeriodEnd: z.string().nullable(),
+  cancelAtPeriodEnd: z.boolean(),
+  /** Whether the co-op has a Stripe customer, so the billing portal can open. */
+  hasBillingAccount: z.boolean(),
+  /** False when Stripe is not configured on this deployment. */
+  billingAvailable: z.boolean(),
+});
+
+export const CheckoutStart = z.object({ interval: z.enum(['month', 'year']) });
+
+export const RedirectUrl = z.object({ url: z.string().url() });
+
 export type CoopRecord = z.infer<typeof CoopRecord>;
+export type BillingStatus = z.infer<typeof BillingStatus>;
 export type CoopClassRecord = z.infer<typeof CoopClassRecord>;
 export type ScheduleRecord = z.infer<typeof ScheduleRecord>;
 export type ScheduleRotationInput = z.infer<typeof RotationInput>;

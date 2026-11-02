@@ -9,6 +9,7 @@ sign-ups, announcements, payments, and volunteer hours in one place.
 - PostgreSQL with Prisma 6
 - Better Auth for email/password accounts, password reset, and an admin role
 - Resend for transactional email
+- Stripe Billing for co-op subscriptions (Checkout, Customer Portal, webhooks)
 - Vitest (unit), Playwright (end-to-end), Biome (lint and format)
 
 ## Getting started
@@ -43,6 +44,7 @@ and verify the email.
 | `npm run db:migrate:dev` | Create a new migration after editing `prisma/schema/*.prisma` |
 | `npm run db:migrate:deploy` | Apply pending migrations (run on every deploy, before `npm start`) |
 | `npm run db:studio` | Browse the database |
+| `npm run stripe:setup` | Create or update the Stripe product, prices, and Customer Portal (reads `.env.local`) |
 
 ## Project layout
 
@@ -81,6 +83,14 @@ tests/
 - Validation errors return `{ errors: { field: 'Message' } }` with status 400.
 - Request-time security headers and the per-request CSP nonce live in
   `proxy.ts`, `next.config.ts`, and `src/lib/csp.ts`.
+
+## Billing
+
+Co-ops get a 30-day free trial, then subscribe for $60/month or $600/year through
+Stripe Checkout. See [docs/payments.md](docs/payments.md) for the design, the webhook
+events to register, and the Stripe Dashboard settings. To check billing end to end
+against a Stripe sandbox, run the app and then
+`node --env-file=.env.local tests/manual/billing-sandbox.mjs`.
 
 ## Deploying
 

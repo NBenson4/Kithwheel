@@ -31,6 +31,13 @@ export const env = createEnv({
     OWNER_EMAIL: z.string().email().optional(),
     // Optional "Continue with Google": both must be set to enable it.
     GOOGLE_SIGNIN_CLIENT_SECRET: z.string().min(1).optional(),
+
+    // Billing (Stripe). Without a secret key, billing routes answer 503 and
+    // co-ops simply stay on their free trial; set it everywhere billing is used.
+    STRIPE_SECRET_KEY: z.string().startsWith('sk_').optional(),
+    STRIPE_WEBHOOK_SECRET: z.string().startsWith('whsec_').optional(),
+    // Turn on once Stripe Tax has a head office address and at least one registration.
+    STRIPE_AUTOMATIC_TAX: z.enum(['true', 'false']).default('false'),
   },
 
   client: {
@@ -51,6 +58,9 @@ export const env = createEnv({
     BETTER_AUTH_TRUSTED_ORIGINS: process.env.BETTER_AUTH_TRUSTED_ORIGINS,
     OWNER_EMAIL: process.env.OWNER_EMAIL,
     GOOGLE_SIGNIN_CLIENT_SECRET: process.env.GOOGLE_SIGNIN_CLIENT_SECRET,
+    STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY,
+    STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET,
+    STRIPE_AUTOMATIC_TAX: process.env.STRIPE_AUTOMATIC_TAX,
     NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
     NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
     NEXT_PUBLIC_GOOGLE_SIGNIN_CLIENT_ID: process.env.NEXT_PUBLIC_GOOGLE_SIGNIN_CLIENT_ID,

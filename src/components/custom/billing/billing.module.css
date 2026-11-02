@@ -1,0 +1,135 @@
+.panel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px 20px;
+  padding: 14px 18px;
+  border: 1px solid var(--border);
+  border-left: 4px solid #8fa58d;
+  background: var(--card);
+  box-shadow: 0 8px 24px rgb(35 57 47 / 0.045);
+}
+
+.panelLocked {
+  border-left-color: #b4683f;
+  background: #fbf6f1;
+}
+
+.panelWarning {
+  border-left-color: #c48a2c;
+  background: #fcf8ee;
+}
+
+.summary {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 320px;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.badge {
+  display: inline-flex;
+  flex: 0 0 auto;
+  min-height: 26px;
+  align-items: center;
+  padding: 4px 9px;
+  border-radius: 999px;
+  color: #244635;
+  background: #e5eee2;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.badgeLocked {
+  color: #82482f;
+  background: #f4e4d9;
+}
+
+.headline {
+  margin: 2px 0 0;
+  color: var(--foreground);
+  font-size: 14px;
+  font-weight: 650;
+  line-height: 1.35;
+}
+
+.detail {
+  margin: 4px 0 0;
+  color: var(--muted-foreground);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.button,
+.quietButton {
+  display: inline-flex;
+  min-height: 40px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 9px 13px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.button {
+  color: var(--primary-foreground);
+  background: var(--primary);
+}
+
+.button:hover:not(:disabled) {
+  background: #274b39;
+}
+
+.quietButton {
+  border-color: var(--border);
+  color: var(--foreground);
+  background: var(--card);
+}
+
+.quietButton:hover:not(:disabled) {
+  border-color: #aab9a9;
+  background: #f2f2e9;
+}
+
+.button:focus-visible,
+.quietButton:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+.button:disabled,
+.quietButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.planNote {
+  padding: 2px 6px;
+  border-radius: 999px;
+  color: var(--primary);
+  background: #eef3ea;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+@media (max-width: 640px) {
+  .actions,
+  .actions > button {
+    width: 100%;
+  }
+}

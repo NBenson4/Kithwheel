@@ -1,7 +1,7 @@
 // Coordinator-owned schedule list and draft creation.
 import 'server-only';
 import { NextResponse } from 'next/server';
-import { requireCoopCoordinator } from '@/lib/business/coordinator-auth';
+import { requireCoopCoordinator, requireCoopEditor } from '@/lib/business/coordinator-auth';
 import { readScheduleList } from '@/lib/business/schedule-data';
 import { ScheduleCreate } from '@/lib/contracts/coops';
 import { prisma } from '@/lib/db';
@@ -21,7 +21,7 @@ export async function GET(_request: Request, context: RouteContext) {
 export async function POST(request: Request, context: RouteContext) {
   if (!sameOrigin(request)) return NextResponse.json({ error: 'forbidden' }, { status: 403 });
   const { coopId } = await context.params;
-  const access = await requireCoopCoordinator(coopId);
+  const access = await requireCoopEditor(coopId);
   if (!access.ok) return access.response;
 
   try {

@@ -94,6 +94,20 @@ export function passwordResetEmail(input: { url: string }): EmailContent {
   return { subject: 'Reset your Kithwheel password', html, text };
 }
 
+/** Sent when a co-op's subscription payment fails; Stripe keeps retrying meanwhile. */
+export function paymentFailedEmail(input: { coopName: string; url: string }): EmailContent {
+  const { html, text } = renderEmail({
+    heading: `We couldn't process ${input.coopName}'s Kithwheel payment`,
+    body: [
+      `The latest payment for ${input.coopName}'s Kithwheel plan didn't go through. We'll try again automatically over the next few days.`,
+      'To avoid any interruption, open Billing in your workspace and update the payment method.',
+    ],
+    cta: { label: 'Update payment method', url: input.url },
+    footer: 'You received this because you coordinate this co-op on Kithwheel.',
+  });
+  return { subject: `Action needed: payment for ${input.coopName}`, html, text };
+}
+
 /** Generic notification email. */
 export function notificationEmail(input: {
   subject: string;
