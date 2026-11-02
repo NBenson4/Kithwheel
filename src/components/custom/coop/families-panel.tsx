@@ -62,38 +62,9 @@ function RegistrationCard({ coopId, settings, onSettings }: Props) {
       </div>
       <div className={styles.stack}>
         <p className={base.muted}>
-          When registration is open, the family link shows a sign-up form. Families give each
-          child’s name and age group; coordinators decide which classes they’re in.
+          While registration is open, your family link shows a short sign-up form: the parent’s name
+          and email, and each child’s name and age group. Families don’t choose classes.
         </p>
-        <fieldset className={styles.stack} style={{ border: 0, margin: 0, padding: 0, gap: 8 }}>
-          <legend className={base.fieldLabel} style={{ marginBottom: 6 }}>
-            When a family registers
-          </legend>
-          <label className={styles.checkRow}>
-            <input
-              type="radio"
-              name="auto-place"
-              checked={settings.autoPlace}
-              disabled={saving}
-              onChange={() =>
-                void update({ autoPlace: true }, 'New children will join their age group’s classes')
-              }
-            />
-            Put each child in all of their age group’s classes (you can change it after)
-          </label>
-          <label className={styles.checkRow}>
-            <input
-              type="radio"
-              name="auto-place"
-              checked={!settings.autoPlace}
-              disabled={saving}
-              onChange={() =>
-                void update({ autoPlace: false }, 'New children will wait for you to place them')
-              }
-            />
-            Wait for a coordinator to place them
-          </label>
-        </fieldset>
         <div className={base.buttonRow}>
           <button
             className={settings.registrationOpen ? base.quietButton : base.button}
@@ -377,6 +348,7 @@ function FamilyDetails({
   }
 
   const childCount = family.children.length;
+  const unplaced = family.children.filter((child) => !child.enrollments.length).length;
   return (
     <details className={styles.details}>
       <summary>
@@ -387,8 +359,15 @@ function FamilyDetails({
             {family.email}
           </span>
         </span>
-        <span className={styles.pill}>
-          {childCount} {childCount === 1 ? 'child' : 'children'}
+        <span className={styles.rowActions}>
+          {unplaced > 0 && (
+            <span className={`${styles.pill} ${styles.pillWarn}`}>
+              {unplaced === childCount ? 'Not placed yet' : `${unplaced} not placed`}
+            </span>
+          )}
+          <span className={styles.pill}>
+            {childCount} {childCount === 1 ? 'child' : 'children'}
+          </span>
         </span>
       </summary>
       <div className={styles.detailsBody}>
@@ -495,9 +474,9 @@ function FamilyDetails({
                     onChange={(ageGroup) =>
                       void run(
                         `/api/coops/${coopId}/children/${child.id}`,
-                        post({ ageGroup: ageGroup || null, movePlacements: true }, 'PATCH'),
+                        post({ ageGroup: ageGroup || null }, 'PATCH'),
                         ageGroup
-                          ? `${child.name} moved to ${ageGroup}, with that group’s classes`
+                          ? `${child.name} is now in ${ageGroup}`
                           : `${child.name}’s age group cleared`,
                       )
                     }
@@ -750,6 +729,10 @@ export function FamiliesPanel({ coopId, settings, onSettings, rotations }: Panel
   const ageGroups = [...new Set(rotations.map((rotation) => rotation.ageGroup))];
   const childCount = overview.families.reduce((sum, family) => sum + family.children.length, 0);
   const waiting = overview.classes.reduce((sum, item) => sum + item.waitlisted, 0);
+  const unplacedCount = overview.families.reduce(
+    (sum, family) => sum + family.children.filter((child) => !child.enrollments.length).length,
+    0,
+  );
   const search = query.trim().toLowerCase();
   const families = search
     ? overview.families.filter((family) =>
@@ -796,10 +779,35 @@ export function FamiliesPanel({ coopId, settings, onSettings, rotations }: Panel
 
   return (
     <div className={styles.stack}>
+      <section className={styles.howItWorks} aria-labelledby="how-heading">
+        <h2 className={base.panelTitle} id="how-heading">
+          How families and classes work
+        </h2>
+        <ol className={styles.steps}>
+          <li>
+            <strong>Families sign up.</strong> Share your family link. While registration is open,
+            parents enter their name, email, and each child’s name and age group. You can also add a
+            family yourself.
+          </li>
+          <li>
+            <strong>Children are added to your co-op.</strong> Each child appears in the list below,
+            marked “Not placed yet.” Signing up never puts a child in a class.
+          </li>
+          <li>
+            <strong>You place them in classes.</strong> In Class placement, choose a class, then
+            select its whole age group or tick individual children.
+          </li>
+        </ol>
+      </section>
+
       <div className={styles.stats}>
         <div className={styles.stat}>
           <span className={styles.statValue}>{overview.families.length}</span>
           <span className={styles.statLabel}>Families</span>
+        </div>
+        <div className={styles.stat}>
+          <span className={styles.statValue}>{unplacedCount}</span>
+          <span className={styles.statLabel}>Children not placed yet</span>
         </div>
         <div className={styles.stat}>
           <span className={styles.statValue}>{childCount}</span>

@@ -150,9 +150,10 @@ test('a co-op runs registration, waitlists, family pages, fees, hours, announcem
   await expect(familyPage.getByText('Ages 5-7 classes: Art Studio, Music Circle')).toBeVisible();
   await familyPage.getByRole('button', { name: 'Register' }).last().click();
   await expect(familyPage.getByRole('heading', { name: 'You’re registered!' })).toBeVisible();
-  // Placed by age group automatically.
-  await expect(familyPage.getByText('Ann: Art Studio')).toBeVisible();
-  await expect(familyPage.getByText('Ann: Music Circle')).toBeVisible();
+  // Signing up only adds the child; coordinators place them.
+  await expect(
+    familyPage.getByText('Your coordinators will place your children in classes'),
+  ).toBeVisible();
   const familyAUrl = linkIn(firstEmail, /https?:\/\/[^\s<]+\/f\/[A-Za-z0-9_-]+/);
 
   // A second family in the same age group: Art (one seat) is full, so Ben waits.
@@ -169,8 +170,8 @@ test('a co-op runs registration, waitlists, family pages, fees, hours, announcem
     },
   );
   expect(second.status).toBe(201);
-  expect(second.body.enrolled).toEqual([{ childName: 'Ben', className: 'Music Circle' }]);
-  expect(second.body.waitlisted).toEqual([{ childName: 'Ben', className: 'Art Studio' }]);
+  expect(second.body.enrolled).toEqual([]);
+  expect(second.body.waitlisted).toEqual([]);
   const familyBUrl = linkIn(secondEmail, /https?:\/\/[^\s<]+\/f\/[A-Za-z0-9_-]+/);
   const familyBToken = familyBUrl.split('/f/')[1] ?? '';
 
@@ -190,13 +191,21 @@ test('a co-op runs registration, waitlists, family pages, fees, hours, announcem
   // Family pages show classes but can't change them.
   await familyPage.goto(new URL(familyAUrl).pathname);
   await expect(familyPage.getByRole('heading', { name: 'Hi, Avery Family' })).toBeVisible();
-  await expect(familyPage.getByText('Enrolled').first()).toBeVisible();
+  await expect(familyPage.getByText('Not placed in classes yet').first()).toBeVisible();
   await expect(familyPage.getByRole('button', { name: 'Drop class' })).toHaveCount(0);
   await expect(familyPage.getByRole('combobox', { name: /Add a class/ })).toHaveCount(0);
 
+  // The coordinator sees both children waiting, then places everyone by age group:
+  // Ann signed up first and gets Art's one seat; Ben waits for it.
+  await page.goto(`/dashboard?coop=${coop.id}&tab=families`);
+  await expect(page.getByRole('heading', { name: 'How families and classes work' })).toBeVisible();
+  await expect(page.getByText('Not placed yet').first()).toBeVisible();
+  await page.getByRole('button', { name: 'Place everyone by age group' }).click();
+  await page.getByRole('button', { name: 'Place everyone', exact: true }).click();
+  await expect(page.getByText('Placed 3, 1 on waitlists')).toBeVisible();
+
   // Placement: the coordinator swaps Art's seat from Ann to Ben, then adds Ann (Ages 5-7)
   // to Science Lab (Ages 8-10) as an exception.
-  await page.goto(`/dashboard?coop=${coop.id}&tab=families`);
   const placement = page.locator('section', {
     has: page.getByRole('heading', { name: 'Class placement' }),
   });
@@ -235,14 +244,12 @@ test('a co-op runs registration, waitlists, family pages, fees, hours, announcem
   expect(classesOf('Ann')).toEqual(['Music Circle:enrolled', 'Science Lab:enrolled']);
   expect(classesOf('Ben')).toEqual(['Art Studio:enrolled', 'Music Circle:enrolled']);
 
-  // Moving Ann to Ages 8-10 swaps Ages 5-7 classes for that group's (Science stays).
+  // Changing Ann's age group changes only the label; her classes stay as placed.
   await json(api, 'PATCH', `/api/coops/${coop.id}/children/${kids.Ann.id}`, {
     ageGroup: 'Ages 8-10',
-    movePlacements: true,
   });
 
-  // With automatic placement off, a new family waits; "Place everyone" then places them.
-  await json(api, 'PATCH', `/api/coops/${coop.id}/settings`, { autoPlace: false });
+  // A later sign-up waits too; "Place everyone" places only who's missing.
   const third = await json(
     familyContext.request,
     'POST',
@@ -270,7 +277,7 @@ test('a co-op runs registration, waitlists, family pages, fees, hours, announcem
         ]),
     ),
   );
-  expect(afterKids.Ann).toEqual(['Science Lab:enrolled']);
+  expect(afterKids.Ann).toEqual(['Music Circle:enrolled', 'Science Lab:enrolled']);
   expect(afterKids.Cora).toEqual(['Art Studio:waitlisted', 'Music Circle:enrolled']);
 
   // Family B logs volunteer hours from their page.

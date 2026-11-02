@@ -29,6 +29,7 @@ type ChildRow = {
   id: string;
   name: string;
   ageGroup: string | null;
+  placed: boolean;
   familyName: string;
 };
 
@@ -51,6 +52,7 @@ export function PlacementPanel({ coopId, overview, onOverview, reload, rotations
           name: child.name,
           ageGroup: child.ageGroup,
           familyName: family.parentName,
+          placed: child.enrollments.length > 0,
         })),
       ),
     [overview],
@@ -177,6 +179,9 @@ export function PlacementPanel({ coopId, overview, onOverview, reload, rotations
         </span>
         {status === 'waitlisted' && !selected.has(child.id) && (
           <span className={`${styles.pill} ${styles.pillWarn}`}>Waitlist</span>
+        )}
+        {!child.placed && !selected.has(child.id) && (
+          <span className={`${styles.pill} ${styles.pillWarn}`}>Not placed yet</span>
         )}
       </label>
     );

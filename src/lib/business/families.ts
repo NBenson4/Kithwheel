@@ -231,14 +231,6 @@ export async function classesByAgeGroup(coopId: string): Promise<Map<string, str
 export const ageGroupKey = (ageGroup: string | null | undefined) =>
   (ageGroup ?? '').trim().toLowerCase();
 
-/** The classes a newly registered child is placed in, when the co-op places by age group. */
-export async function autoPlacementFor(coopId: string) {
-  const coop = await prisma.coop.findUnique({ where: { id: coopId }, select: { autoPlace: true } });
-  if (!coop?.autoPlace) return () => [] as string[];
-  const groups = await classesByAgeGroup(coopId);
-  return (ageGroup: string | null | undefined) => groups.get(ageGroupKey(ageGroup)) ?? [];
-}
-
 // ── Registration ────────────────────────────────────────────────────────────
 
 export type RegistrationOutcome =
@@ -254,10 +246,9 @@ export type RegistrationOutcome =
   | { status: 'invalid'; message: string };
 
 /**
- * Creates a family and its children. Coordinators place children in classes: either the
- * co-op places new children by age group automatically, or a coordinator does it later.
- * A coordinator adding a family may also pick classes directly (`source: 'coordinator'`);
- * families registering themselves never choose classes.
+ * Creates a family and its children. Registering only records the children; coordinators
+ * put them in classes afterwards. (A coordinator adding a family through the API may pass
+ * class ids, `source: 'coordinator'`; what families send is ignored.)
  */
 export async function registerFamily(
   coopId: string,
@@ -281,7 +272,6 @@ export async function registerFamily(
       return { status: 'invalid', message: 'One of those classes no longer exists.' };
     }
   }
-  const byAgeGroup = await autoPlacementFor(coopId);
 
   const accessToken = newToken();
   try {
@@ -306,9 +296,7 @@ export async function registerFamily(
             ageGroup: childInput.ageGroup || null,
           },
         });
-        const picks = chosen(childInput);
-        const classIds = picks.length ? picks : byAgeGroup(childInput.ageGroup);
-        for (const classId of [...new Set(classIds)]) {
+        for (const classId of [...new Set(chosen(childInput))]) {
           const placed = await placeChild(tx, coopId, child.id, classId);
           if (!placed) continue;
           (placed.status === 'ENROLLED' ? enrolled : waitlisted).push({

@@ -22,7 +22,6 @@ export const CoopSettings = z.object({
   shareUrl: z.string().nullable(),
   kioskUrl: z.string().nullable(),
   registrationOpen: z.boolean(),
-  autoPlace: z.boolean(),
   registrationNote: z.string().nullable(),
   timeZone: z.string(),
   meetingDay: z.number().int().min(0).max(6).nullable(),
@@ -45,7 +44,6 @@ export const CoopSettings = z.object({
 export const CoopSettingsUpdate = z
   .object({
     registrationOpen: z.boolean(),
-    autoPlace: z.boolean(),
     registrationNote: z.string().trim().max(1000, 'Note is too long').nullable(),
     timeZone: z.enum(TIME_ZONES),
     meetingDay: z.number().int().min(0).max(6).nullable(),
@@ -254,8 +252,6 @@ export const ChildUpdate = z
   .object({
     name: z.string().trim().min(1, 'Name is required').max(120, 'Name is too long'),
     ageGroup: z.string().trim().max(80).nullable(),
-    /** When the age group changes, swap the old group's classes for the new group's. */
-    movePlacements: z.boolean(),
   })
   .partial()
   .refine((value) => Object.keys(value).length > 0, 'No changes were provided');

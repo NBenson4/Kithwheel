@@ -3,7 +3,7 @@ import 'server-only';
 import { NextResponse } from 'next/server';
 import { readFamilyOverview } from '@/lib/business/coop-views';
 import { requireCoopEditor } from '@/lib/business/coordinator-auth';
-import { autoPlacementFor, placeChild } from '@/lib/business/families';
+import { placeChild } from '@/lib/business/families';
 import { guardOrigin, notFound, readBody, serverError } from '@/lib/business/route-helpers';
 import { ChildInput } from '@/lib/contracts/coop-features';
 import { prisma } from '@/lib/db';
@@ -27,13 +27,11 @@ export async function POST(request: Request, context: RouteContext) {
     return NextResponse.json({ error: 'A family can have up to 12 children.' }, { status: 409 });
   }
   try {
-    const byAgeGroup = await autoPlacementFor(coopId);
     await prisma.$transaction(async (tx) => {
       const child = await tx.coopChild.create({
         data: { coopId, familyId, name: body.data.name, ageGroup: body.data.ageGroup || null },
       });
-      const classIds = body.data.classIds.length ? body.data.classIds : byAgeGroup(child.ageGroup);
-      for (const classId of [...new Set(classIds)]) {
+      for (const classId of [...new Set(body.data.classIds)]) {
         await placeChild(tx, coopId, child.id, classId);
       }
     });

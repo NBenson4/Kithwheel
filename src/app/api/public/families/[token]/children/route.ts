@@ -1,14 +1,9 @@
-// A family adds another child while registration is open. Coordinators place children in
-// classes; when the co-op places by age group, the child joins their age group's classes.
+// A family adds another child while registration is open. The child is recorded only;
+// coordinators put them in classes.
 import 'server-only';
 import { NextResponse } from 'next/server';
 import { readFamilyHome } from '@/lib/business/coop-views';
-import {
-  autoPlacementFor,
-  coopIsActive,
-  PAUSED_MESSAGE,
-  placeChild,
-} from '@/lib/business/families';
+import { coopIsActive, PAUSED_MESSAGE } from '@/lib/business/families';
 import { familyByToken, linkNotFound } from '@/lib/business/public-access';
 import { guardOrigin, readBody, serverError } from '@/lib/business/route-helpers';
 import { ChildInput } from '@/lib/contracts/coop-features';
@@ -35,19 +30,13 @@ export async function POST(request: Request, context: RouteContext) {
     return NextResponse.json({ error: 'A family can have up to 12 children.' }, { status: 409 });
   }
   try {
-    const byAgeGroup = await autoPlacementFor(family.coopId);
-    await prisma.$transaction(async (tx) => {
-      const child = await tx.coopChild.create({
-        data: {
-          coopId: family.coopId,
-          familyId: family.id,
-          name: body.data.name,
-          ageGroup: body.data.ageGroup || null,
-        },
-      });
-      for (const classId of byAgeGroup(child.ageGroup)) {
-        await placeChild(tx, family.coopId, child.id, classId);
-      }
+    await prisma.coopChild.create({
+      data: {
+        coopId: family.coopId,
+        familyId: family.id,
+        name: body.data.name,
+        ageGroup: body.data.ageGroup || null,
+      },
     });
     return NextResponse.json(await readFamilyHome(token), { status: 201 });
   } catch {

@@ -17,8 +17,6 @@ model Coop {
   // Private link families use to see the schedule and register (no account needed).
   shareToken               String?            @unique
   registrationOpen         Boolean            @default(false)
-  // New registrations go straight into their age group's classes; coordinators adjust.
-  autoPlace                Boolean            @default(true)
   registrationNote         String?
   // Calendar feed: the weekly co-op day (0 = Sunday) between the term dates, in this time zone.
   timeZone                 String             @default("America/New_York")
