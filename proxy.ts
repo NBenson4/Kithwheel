@@ -14,11 +14,19 @@
 // rationale lives in csp.ts and the posture is locked by tests/unit/csp.test.ts.
 
 import { type NextRequest, NextResponse } from 'next/server';
+import { canonicalRedirect } from '@/lib/canonical-host';
 import { buildCsp } from '@/lib/csp';
 // Per-app extra CSP sources (frame/connect/media/font/img). User-owned, default empty.
 import { cspExtraSources } from './next.user-config';
 
 export function proxy(request: NextRequest) {
+  // Send production *.vercel.app visitors to the public domain (sign-in only works there).
+  const redirectTo = canonicalRedirect(request.url, request.headers.get('host'), {
+    appUrl: process.env.NEXT_PUBLIC_APP_URL,
+    vercelEnv: process.env.VERCEL_ENV,
+  });
+  if (redirectTo) return NextResponse.redirect(redirectTo, 308);
+
   const nonce = Buffer.from(crypto.randomUUID()).toString('base64');
   const isDev = process.env.NODE_ENV === 'development';
 
