@@ -160,14 +160,19 @@ export const auth = betterAuth({
           .replaceAll('<', '&lt;')
           .replaceAll('>', '&gt;')
           .replaceAll("'", '&#39;');
-        const result = await sendEmail({
-          to: user.email,
-          subject: 'Verify your email',
-          html: `<p><a href="${href}">Verify your email</a></p>`,
-          text: `Verify your email: ${url}`,
-        });
-        // The proxy can accept a suppressed recipient without sending mail.
-        if (!result.id) throw new Error('Verification email could not be delivered');
+        // Better Auth awaits this during sign-up. Verification is optional, so an
+        // email outage must never block creating an account: log and continue.
+        try {
+          await sendEmail({
+            to: user.email,
+            subject: 'Verify your email',
+            html: `<p><a href="${href}">Verify your email</a></p>`,
+            text: `Verify your email: ${url}`,
+          });
+        } catch (error) {
+          // biome-ignore lint/suspicious/noConsole: email delivery diagnostics.
+          console.error('[auth] verification email failed', error);
+        }
       }),
   },
   // Better Auth's verification callback can write the pre-verification user to

@@ -104,6 +104,10 @@ Any Node host with PostgreSQL works. On each deploy:
 
 `GET /health` returns 200 for health checks.
 
+**Vercel:** import the GitHub repo and add a Neon database from the project's Storage
+tab. Vercel runs `npm run vercel-build`, which applies migrations over the unpooled
+connection (`DATABASE_URL_UNPOOLED`, falling back to `DATABASE_URL`) and then builds.
+
 ## History
 
 The first version was generated with Polsia and migrated off it. See

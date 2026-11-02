@@ -23,7 +23,8 @@
     "db:studio": "prisma studio",
     "postinstall": "prisma generate",
     "test:e2e": "playwright test",
-    "stripe:setup": "node --env-file=.env.local scripts/stripe-setup.mjs"
+    "stripe:setup": "node --env-file=.env.local scripts/stripe-setup.mjs",
+    "vercel-build": "DATABASE_URL=\"${DATABASE_URL_UNPOOLED:-$DATABASE_URL}\" prisma migrate deploy && next build"
   },
   "dependencies": {
     "@hookform/resolvers": "5.4.0",
