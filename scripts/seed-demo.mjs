@@ -5,8 +5,9 @@
 //
 // It signs in as the demo coordinator, creates the co-op if it doesn't exist, and adds
 // classes, a published schedule, settings, families, payments, volunteer hours and
-// attendance. Sample families use @example.com addresses and are added without email.
-// Run it once on a fresh co-op; running it again adds duplicate classes.
+// attendance. Sample families use Resend test addresses (delivered+name@resend.dev): announcements to them succeed without emailing anyone.
+// If the co-op already has a published schedule, its classes and rotations are kept and
+// just given seats, fees and materials. Run it once; running it again adds more families.
 
 const base = (process.env.BASE_URL ?? 'http://localhost:3000').replace(/\/$/, '');
 const email = process.env.DEMO_EMAIL;
@@ -41,43 +42,109 @@ if (!coop) coop = await call('POST', '/api/coops', { name: coopName });
 const id = coop.id;
 console.log(`Seeding ${coop.name} (${id}) on ${base}`);
 
-const classSpecs = [
-  ['Nature Journaling', 'Ms. Rivera', 'Garden room', '9:00-9:50', 10, 1500, 'Sketchbook, colored pencils, clipboard'],
-  ['Story Circle', 'Mrs. Okafor', 'Library', '10:00-10:50', 12, 0, 'A favorite picture book to share'],
-  ['Hands-on Science', 'Mr. Chen', 'Room 3', '9:00-9:50', 5, 2500, 'Safety goggles (provided), old T-shirt'],
-  ['Art Studio', 'Ms. Patel', 'Art room', '10:00-10:50', 10, 2000, 'Smock or old shirt'],
-  ['Fifty Nifty States', 'Mr. Benson', 'Room 1', '11:00-11:50', 14, 0, 'Folder and pencil'],
-  ['Choir', 'Mrs. Lindqvist', 'Fellowship hall', '11:00-11:50', null, 0, null],
-  ['Creative Writing', 'Ms. Grant', 'Library', '9:00-9:50', 10, 0, 'Composition notebook'],
-  ['Physical Education', 'Coach Dunn', 'Gym', '10:00-10:50', null, 1000, 'Sneakers and a water bottle'],
-  ['Debate Club', 'Mr. Ortiz', 'Room 2', '11:00-11:50', 12, 0, null],
-];
-const classes = {};
-for (const [name, teacher, room, time, capacity, feeCents, materials] of classSpecs) {
-  const created = await call('POST', `/api/coops/${id}/classes`, {
-    name,
-    teacher,
-    room,
-    time,
-    capacity,
-    feeCents,
-    ...(materials ? { materials } : {}),
-  });
-  classes[name] = created.id;
+const existing = await call('GET', `/api/coops/${id}/schedules`);
+const current = existing.items.find((item) => item.id === existing.currentScheduleId);
+let rotations; // [{ ageGroup, classIds }]
+
+if (current) {
+  // Keep the co-op's own schedule; add seats, fees and materials to its classes.
+  const extras = [
+    [6, 1500, 'Sketchbook, colored pencils, clipboard'],
+    [10, 0, 'A favorite picture book to share'],
+    [5, 2500, 'Safety goggles (provided), old T-shirt'],
+    [10, 2000, 'Smock or old shirt'],
+    [14, 0, 'Folder and pencil'],
+    [null, 1000, 'Sneakers and a water bottle'],
+  ];
+  const seen = new Set();
+  let index = 0;
+  for (const rotation of current.rotations) {
+    for (const entry of rotation.entries) {
+      if (seen.has(entry.class.id)) continue;
+      seen.add(entry.class.id);
+      const [capacity, feeCents, materials] = extras[index % extras.length];
+      index += 1;
+      await call('PATCH', `/api/coops/${id}/classes/${entry.class.id}`, {
+        capacity,
+        feeCents,
+        materials,
+      });
+    }
+  }
+  rotations = current.rotations.map((rotation) => ({
+    ageGroup: rotation.ageGroup,
+    classIds: rotation.entries.map((entry) => entry.class.id),
+  }));
+} else {
+  const classSpecs = [
+    [
+      'Nature Journaling',
+      'Ms. Rivera',
+      'Garden room',
+      '9:00-9:50',
+      10,
+      1500,
+      'Sketchbook, colored pencils, clipboard',
+    ],
+    [
+      'Story Circle',
+      'Mrs. Okafor',
+      'Library',
+      '10:00-10:50',
+      12,
+      0,
+      'A favorite picture book to share',
+    ],
+    ['Choir', 'Mrs. Lindqvist', 'Fellowship hall', '11:00-11:50', null, 0, null],
+    [
+      'Hands-on Science',
+      'Mr. Chen',
+      'Room 3',
+      '9:00-9:50',
+      5,
+      2500,
+      'Safety goggles (provided), old T-shirt',
+    ],
+    ['Art Studio', 'Ms. Patel', 'Art room', '10:00-10:50', 10, 2000, 'Smock or old shirt'],
+    ['Fifty Nifty States', 'Mr. Benson', 'Room 1', '11:00-11:50', 14, 0, 'Folder and pencil'],
+    ['Creative Writing', 'Ms. Grant', 'Library', '9:00-9:50', 10, 0, 'Composition notebook'],
+    [
+      'Physical Education',
+      'Coach Dunn',
+      'Gym',
+      '10:00-10:50',
+      null,
+      1000,
+      'Sneakers and a water bottle',
+    ],
+    ['Debate Club', 'Mr. Ortiz', 'Room 2', '11:00-11:50', 12, 0, null],
+  ];
+  const ids = [];
+  for (const [name, teacher, room, time, capacity, feeCents, materials] of classSpecs) {
+    const created = await call('POST', `/api/coops/${id}/classes`, {
+      name,
+      teacher,
+      room,
+      time,
+      capacity,
+      feeCents,
+      ...(materials ? { materials } : {}),
+    });
+    ids.push(created.id);
+  }
+  rotations = [
+    { ageGroup: 'Ages 5-7', classIds: ids.slice(0, 3) },
+    { ageGroup: 'Ages 8-10', classIds: ids.slice(3, 6) },
+    { ageGroup: 'Ages 11-14', classIds: ids.slice(6, 9) },
+  ];
+  const schedules = await call('POST', `/api/coops/${id}/schedules`, { title: 'Spring 2027 Term' });
+  const scheduleId = schedules.items[0].id;
+  await call('PATCH', `/api/coops/${id}/schedules/${scheduleId}`, { rotations });
+  await call('POST', `/api/coops/${id}/schedules/${scheduleId}/publish`, {});
 }
 
-const schedules = await call('POST', `/api/coops/${id}/schedules`, { title: 'Spring 2027 Term' });
-const scheduleId = schedules.items[0].id;
-await call('PATCH', `/api/coops/${id}/schedules/${scheduleId}`, {
-  rotations: [
-    { ageGroup: 'Ages 5-7', classIds: [classes['Nature Journaling'], classes['Story Circle'], classes['Choir']] },
-    { ageGroup: 'Ages 8-10', classIds: [classes['Hands-on Science'], classes['Art Studio'], classes['Fifty Nifty States']] },
-    { ageGroup: 'Ages 11-14', classIds: [classes['Creative Writing'], classes['Physical Education'], classes['Debate Club']] },
-  ],
-});
-await call('POST', `/api/coops/${id}/schedules/${scheduleId}/publish`, {});
-
-await call('POST', `/api/coops/${id}/share`, {});
+const before = await call('GET', `/api/coops/${id}/settings`);
+if (!before.shareUrl) await call('POST', `/api/coops/${id}/share`, {});
 await call('PATCH', `/api/coops/${id}/settings`, {
   meetingDay: 2,
   termStart: '2027-01-12',
@@ -86,39 +153,86 @@ await call('PATCH', `/api/coops/${id}/settings`, {
   familyFeeCents: 7500,
   childFeeCents: 2500,
   volunteerMinutesRequired: 10 * 60,
-  paymentInstructions: 'Venmo @maple-grove-coop, or bring a check made out to Maple Grove Co-op on co-op day.',
+  paymentInstructions:
+    'Venmo @maple-grove-coop, or bring a check made out to Maple Grove Co-op on co-op day.',
   registrationOpen: true,
-  registrationNote: 'Spring registration is open through January 5. New families: we’d love to meet you first, so reply to your confirmation email with any questions.',
+  registrationNote:
+    'Spring registration is open through January 5. New families: we’d love to meet you first, so reply to your confirmation email with any questions.',
 });
-await call('POST', `/api/coops/${id}/kiosk`, {});
+if (!before.kioskUrl) await call('POST', `/api/coops/${id}/kiosk`, {});
 
+// [parent, [[child, rotation index, class positions in that rotation]]]
 const families = [
-  ['Jordan Avery', [['Mia Avery', 'Ages 5-7', ['Nature Journaling', 'Story Circle']], ['Leo Avery', 'Ages 8-10', ['Hands-on Science', 'Fifty Nifty States']]]],
-  ['Priya Shah', [['Anika Shah', 'Ages 8-10', ['Art Studio', 'Hands-on Science']]]],
-  ['Sam & Dana Brooks', [['Eli Brooks', 'Ages 11-14', ['Creative Writing', 'Physical Education']], ['Ruby Brooks', 'Ages 5-7', ['Choir', 'Nature Journaling']]]],
-  ['Maria Gonzalez', [['Sofia Gonzalez', 'Ages 8-10', ['Art Studio', 'Fifty Nifty States']], ['Mateo Gonzalez', 'Ages 5-7', ['Story Circle']]]],
-  ['Hannah Kim', [['Grace Kim', 'Ages 11-14', ['Creative Writing', 'Debate Club']]]],
-  ['Tom Whitaker', [['Owen Whitaker', 'Ages 8-10', ['Hands-on Science', 'Art Studio']], ['Lily Whitaker', 'Ages 8-10', ['Hands-on Science', 'Fifty Nifty States']]]],
-  ['Aisha Bello', [['Zara Bello', 'Ages 5-7', ['Nature Journaling', 'Choir']]]],
-  ['Chris Novak', [['Ivy Novak', 'Ages 8-10', ['Hands-on Science', 'Art Studio']], ['Max Novak', 'Ages 11-14', ['Physical Education']]]],
-  ['Rebecca Stone', [['Noah Stone', 'Ages 8-10', ['Hands-on Science', 'Art Studio']]]],
-  ['Daniel Park', [['Hazel Park', 'Ages 8-10', ['Hands-on Science', 'Fifty Nifty States']]]],
+  [
+    'Jordan Avery',
+    [
+      ['Mia Avery', 0, [0, 1]],
+      ['Leo Avery', 1, [0, 2]],
+    ],
+  ],
+  ['Priya Shah', [['Anika Shah', 1, [1, 0]]]],
+  [
+    'Sam & Dana Brooks',
+    [
+      ['Eli Brooks', 2, [0, 1]],
+      ['Ruby Brooks', 0, [2, 0]],
+    ],
+  ],
+  [
+    'Maria Gonzalez',
+    [
+      ['Sofia Gonzalez', 1, [1, 2]],
+      ['Mateo Gonzalez', 0, [1]],
+    ],
+  ],
+  ['Hannah Kim', [['Grace Kim', 2, [0, 2]]]],
+  [
+    'Tom Whitaker',
+    [
+      ['Owen Whitaker', 1, [0, 1]],
+      ['Lily Whitaker', 1, [0, 2]],
+    ],
+  ],
+  ['Aisha Bello', [['Zara Bello', 0, [0, 2]]]],
+  [
+    'Chris Novak',
+    [
+      ['Ivy Novak', 1, [0, 1]],
+      ['Max Novak', 2, [1]],
+    ],
+  ],
+  ['Rebecca Stone', [['Noah Stone', 1, [0, 1]]]],
+  ['Daniel Park', [['Hazel Park', 1, [0, 2]]]],
 ];
 let overview;
 for (const [parentName, children] of families) {
-  const slug = parentName.toLowerCase().replace(/[^a-z]+/g, '.').replace(/^\.|\.$/g, '');
-  overview = await call('POST', `/api/coops/${id}/families`, {
+  const slug = parentName
+    .toLowerCase()
+    .replace(/[^a-z]+/g, '.')
+    .replace(/^\.|\.$/g, '');
+  // Families that already exist (same email) are skipped, so the script can be rerun.
+  await call('POST', `/api/coops/${id}/families`, {
     parentName,
-    email: `${slug}@example.com`,
-    phone: '(215) 555-01' + String(Math.floor(Math.random() * 90) + 10),
+    email: `delivered+${slug.replace(/\./g, "-")}@resend.dev`,
+    phone: `(215) 555-01${String(Math.floor(Math.random() * 90) + 10)}`,
     sendEmail: false,
-    children: children.map(([name, ageGroup, picks]) => ({
-      name,
-      ageGroup,
-      classIds: picks.map((pick) => classes[pick]),
-    })),
+    children: children.map(([name, rotationIndex, positions]) => {
+      const rotation = rotations[rotationIndex % rotations.length];
+      return {
+        name,
+        ageGroup: rotation.ageGroup,
+        classIds: [
+          ...new Set(
+            positions.map((position) => rotation.classIds[position % rotation.classIds.length]),
+          ),
+        ],
+      };
+    }),
+  }).catch((error) => {
+    if (!String(error.message).includes('409')) throw error;
   });
 }
+overview = await call('GET', `/api/coops/${id}/families`);
 
 const byName = Object.fromEntries(overview.families.map((family) => [family.parentName, family]));
 const payments = [

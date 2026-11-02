@@ -16,7 +16,9 @@ Stripe **sandbox**). These are the remaining steps before taking real payments.
 
 - [ ] Form the LLC and get an EIN
 - [ ] Business bank account
-- [ ] Terms of service and privacy policy (families' and children's data), linked from the site
+- [ ] Terms of service and privacy policy, linked from the site and the registration form.
+      Kithwheel now stores children's names, attendance, family contact details and payment
+      records, so this matters before real co-ops sign up.
 - [ ] Recommended: DMARC record `_dmarc` → `v=DMARC1; p=none;` (if not added yet)
 
 ## Stripe go-live (after the LLC)
@@ -45,4 +47,9 @@ Stripe **sandbox**). These are the remaining steps before taking real payments.
 
 - Demo account on kithwheel.org: `demo@kithwheel.org` (sample co-op "Maple Grove
   Homeschool Co-op"). Its free trial ends 30 days after 2026-11-02.
+- The demo co-op has 10 sample families (filled by `scripts/seed-demo.mjs`) with fees,
+  payments, volunteer hours, attendance, a waitlist and one announcement. Their emails are
+  Resend test addresses (`delivered+…@resend.dev`), so announcements in a demo succeed
+  without emailing anyone. The family link and check-in tablet link are on the Families
+  and Check-in tabs.
 - Test data from setup checks: accounts and co-ops named "(delete me)" can be removed.
