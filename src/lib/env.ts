@@ -19,7 +19,7 @@ export const env = createEnv({
     // Email (Resend). Optional in development: without a key, emails are printed
     // to the server console instead of being sent. Required in production.
     RESEND_API_KEY: z.string().min(1).optional(),
-    EMAIL_FROM: z.string().min(3).default('Kithwheel <onboarding@resend.dev>'),
+    EMAIL_FROM: z.string().min(3).default('Kithwheel <hello@kithwheel.org>'),
     EMAIL_REPLY_TO: z.string().email().optional(),
 
     // Authentication (Better Auth).

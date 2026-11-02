@@ -61,7 +61,7 @@ test('coordinator composes, publishes, withdraws, and scopes a saved schedule', 
   const contactLink = page.getByRole('link', { name: 'Get in touch' });
   await expect(contactLink).toHaveAttribute(
     'href',
-    'mailto:hello@kithwheel.com?subject=Hello%20Kithwheel',
+    'mailto:hello@kithwheel.org?subject=Hello%20Kithwheel',
   );
   await expect(page.getByRole('link', { name: 'Sign in' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Sign up' })).toBeVisible();

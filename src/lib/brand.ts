@@ -4,7 +4,7 @@
 export const siteName = 'Kithwheel';
 
 /** Public contact address shown on the landing page. Update once the domain's mailbox exists. */
-export const contactEmail = 'hello@kithwheel.com';
+export const contactEmail = 'hello@kithwheel.org';
 export const siteDescription =
   'The co-op management app that keeps every moving part in sync. Schedules, sign-ups, class announcements, payments and volunteer hours for homeschool co-ops.';
 
