@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: Lint, test, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: kithwheel
+          POSTGRES_PASSWORD: kithwheel
+          POSTGRES_DB: kithwheel
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U kithwheel"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://kithwheel:kithwheel@localhost:5432/kithwheel
+      TEST_DATABASE_URL: postgresql://kithwheel:kithwheel@localhost:5432/kithwheel
+      SKIP_ENV_VALIDATION: '1'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # Each gate runs even if an earlier one failed, so one red run shows every problem.
+      - name: Lint
+        run: npm run lint
+      - name: Unit tests
+        if: ${{ !cancelled() }}
+        run: npm test
+      - name: Apply migrations to a fresh database
+        if: ${{ !cancelled() }}
+        run: npm run db:migrate:deploy
+      - name: Schema matches migrations
+        if: ${{ !cancelled() }}
+        run: npx prisma migrate diff --from-url "$DATABASE_URL" --to-schema-datamodel prisma/schema --exit-code
+      - name: Database tests
+        if: ${{ !cancelled() }}
+        run: npm run test:postgres
+      - name: Build
+        if: ${{ !cancelled() }}
+        run: npm run build
+      # After the build on purpose: tsconfig includes Next's generated .next/types.
+      - name: Typecheck
+        if: ${{ !cancelled() }}
+        run: npm run typecheck
