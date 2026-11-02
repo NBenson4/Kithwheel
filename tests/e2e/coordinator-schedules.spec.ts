@@ -83,7 +83,7 @@ test('coordinator composes, publishes, withdraws, and scopes a saved schedule', 
   await expect(page.getByRole('heading', { name: 'Start with your co-op' })).toBeVisible();
   await page.getByLabel('Co-op name').fill('Cedar Grove Co-op');
   await page.getByRole('button', { name: 'Create co-op' }).click();
-  await expect(page.getByRole('heading', { name: 'Schedule desk' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Co-op workspace' })).toBeVisible();
   await expect(page.getByRole('option', { name: 'Cedar Grove Co-op' })).toBeAttached();
 
   const coopResponse = await coordinator.context.request.get('/api/coops');

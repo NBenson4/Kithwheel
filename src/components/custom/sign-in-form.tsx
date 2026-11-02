@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { signIn } from '@/lib/auth-client';
+import { nextPath } from '@/lib/next-path';
 
 // Email + password sign-in. Composes the template's base shadcn primitives
 // (Button/Input/Label) styled through the theme tokens. Restyle freely — this
@@ -26,13 +27,13 @@ export function SignInForm() {
       const { error: signInError } = await signIn.email({
         email,
         password,
-        callbackURL: '/dashboard',
+        callbackURL: nextPath(),
       });
       if (signInError) {
         setError('That email and password do not match. Please try again.');
         return;
       }
-      window.location.assign('/dashboard');
+      window.location.assign(nextPath());
     } catch {
       setError('We could not sign you in. Please try again.');
     } finally {

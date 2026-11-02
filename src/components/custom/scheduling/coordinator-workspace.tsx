@@ -1,13 +1,24 @@
 // Kithwheel's co-op schedule desk.
 'use client';
 
-import { CalendarDays, Plus, School, Trash2 } from 'lucide-react';
+import { CalendarDays, Copy, FileUp, Plus, School, Trash2 } from 'lucide-react';
 import { type FormEvent, useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { BillingPanel } from '@/components/custom/billing/billing-panel';
+import { AnnouncementsPanel } from '@/components/custom/coop/announcements-panel';
+import { AttendancePanel } from '@/components/custom/coop/attendance-panel';
+import { ClassImport } from '@/components/custom/coop/class-import';
+import tabStyles from '@/components/custom/coop/coop.module.css';
+import { FamiliesPanel } from '@/components/custom/coop/families-panel';
+import { FeesPanel } from '@/components/custom/coop/fees-panel';
+import { SettingsPanel } from '@/components/custom/coop/settings-panel';
+import { SetupChecklist, type WorkspaceTab } from '@/components/custom/coop/setup-checklist';
+import { errorMessage } from '@/components/custom/coop/shared';
+import { VolunteerPanel } from '@/components/custom/coop/volunteer-panel';
 import { ScheduleEditor } from '@/components/custom/scheduling/schedule-editor';
 import styles from '@/components/custom/scheduling/scheduling.module.css';
 import { apiFetch } from '@/lib/api-client';
+import { CoopSettings, type CoopSettings as CoopSettingsType } from '@/lib/contracts/coop-features';
 import {
   type CoopRecord as Coop,
   type CoopClassRecord as CoopClass,
@@ -19,6 +30,7 @@ import {
   ScheduleList,
   type ScheduleRecord,
 } from '@/lib/contracts/coops';
+import { centsToDollarInput, dollarsToCents } from '@/lib/coop/money';
 
 type ClassDraft = {
   name: string;
@@ -26,26 +38,36 @@ type ClassDraft = {
   teacher: string;
   room: string;
   time: string;
+  capacity: string;
+  fee: string;
+  materials: string;
 };
 
-const emptyClass: ClassDraft = { name: '', description: '', teacher: '', room: '', time: '' };
+const emptyClass: ClassDraft = {
+  name: '',
+  description: '',
+  teacher: '',
+  room: '',
+  time: '',
+  capacity: '',
+  fee: '',
+  materials: '',
+};
 
-function errorMessage(error: unknown) {
-  if (!(error instanceof Error)) return 'Something went wrong. Please try again.';
-  const cause = error.cause;
-  if (cause && typeof cause === 'object') {
-    const body = cause as Record<string, unknown>;
-    if (typeof body.error === 'string') return body.error;
-    if (body.errors && typeof body.errors === 'object') {
-      const messages = Object.values(body.errors as Record<string, unknown>).flatMap((value) =>
-        Array.isArray(value)
-          ? value.filter((item): item is string => typeof item === 'string')
-          : [],
-      );
-      if (messages[0]) return messages[0];
-    }
-  }
-  return error.message;
+const TABS: { id: WorkspaceTab; label: string }[] = [
+  { id: 'schedule', label: 'Schedule' },
+  { id: 'families', label: 'Families' },
+  { id: 'checkin', label: 'Check-in' },
+  { id: 'announcements', label: 'Announcements' },
+  { id: 'volunteer', label: 'Volunteer hours' },
+  { id: 'fees', label: 'Fees' },
+  { id: 'settings', label: 'Settings & team' },
+];
+
+function initialTab(): WorkspaceTab {
+  if (typeof window === 'undefined') return 'schedule';
+  const requested = new URL(window.location.href).searchParams.get('tab');
+  return TABS.some((tab) => tab.id === requested) ? (requested as WorkspaceTab) : 'schedule';
 }
 
 export function CoordinatorWorkspace() {
@@ -67,6 +89,25 @@ export function CoordinatorWorkspace() {
   const [editingClassId, setEditingClassId] = useState<string | null>(null);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [settings, setSettings] = useState<CoopSettingsType | null>(null);
+  const [tab, setTab] = useState<WorkspaceTab>('schedule');
+  const [importOpen, setImportOpen] = useState(false);
+  const [copying, setCopying] = useState(false);
+
+  useEffect(() => {
+    setTab(initialTab());
+  }, []);
+
+  function goTo(next: WorkspaceTab) {
+    setTab(next);
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.set('tab', next);
+      window.history.replaceState(null, '', url);
+    } catch {
+      // The tab still switches; only the address bar isn't updated.
+    }
+  }
 
   const loadCoops = useCallback(async () => {
     setLoading(true);
@@ -97,11 +138,13 @@ export function CoordinatorWorkspace() {
     setLoadingCoopData(true);
     setCoopDataError(false);
     try {
-      const [classResult, scheduleResult] = await Promise.all([
+      const [classResult, scheduleResult, settingsResult] = await Promise.all([
         apiFetch(`/api/coops/${selectedCoopId}/classes`, { schema: CoopClassList }),
         apiFetch(`/api/coops/${selectedCoopId}/schedules`, { schema: ScheduleList }),
+        apiFetch(`/api/coops/${selectedCoopId}/settings`, { schema: CoopSettings }),
       ]);
       setClasses(classResult.items);
+      setSettings(settingsResult);
       setSchedules(scheduleResult.items);
       setCurrentScheduleId(scheduleResult.currentScheduleId);
       setSelectedScheduleId((current) =>
@@ -113,6 +156,7 @@ export function CoordinatorWorkspace() {
       setClasses([]);
       setSchedules([]);
       setCurrentScheduleId(null);
+      setSettings(null);
       setCoopDataError(true);
     } finally {
       setLoadingCoopData(false);
@@ -168,6 +212,25 @@ export function CoordinatorWorkspace() {
     }
   }
 
+  async function copySchedule(schedule: ScheduleRecord) {
+    if (!coopId) return;
+    setCopying(true);
+    try {
+      const result = await apiFetch(`/api/coops/${coopId}/schedules/${schedule.id}/duplicate`, {
+        method: 'POST',
+        body: JSON.stringify({}),
+        schema: ScheduleList,
+      });
+      setSchedules(result.items);
+      setSelectedScheduleId(result.items[0]?.id ?? null);
+      toast.success(`Copied “${schedule.title}” into a new draft`);
+    } catch (error) {
+      toast.error(errorMessage(error));
+    } finally {
+      setCopying(false);
+    }
+  }
+
   function startClassEdit(item: CoopClass) {
     setConfirmingDelete(false);
     setEditingClassId(item.id);
@@ -177,6 +240,9 @@ export function CoordinatorWorkspace() {
       teacher: item.teacher ?? '',
       room: item.room ?? '',
       time: item.time ?? '',
+      capacity: item.capacity ? String(item.capacity) : '',
+      fee: centsToDollarInput(item.feeCents),
+      materials: item.materials ?? '',
     });
     setClassFormOpen(true);
   }
@@ -187,10 +253,21 @@ export function CoordinatorWorkspace() {
     const path = editingClassId
       ? `/api/coops/${coopId}/classes/${editingClassId}`
       : `/api/coops/${coopId}/classes`;
+    const capacity = classDraft.capacity.trim() === '' ? null : Number(classDraft.capacity);
+    const feeCents = dollarsToCents(classDraft.fee);
+    if (capacity !== null && (!Number.isInteger(capacity) || capacity < 1)) {
+      toast.error('Capacity needs to be a whole number of seats, or left empty for no limit.');
+      return;
+    }
+    if (feeCents === null || feeCents < 0) {
+      toast.error('Enter the class fee as a dollar amount, like 15 or 12.50.');
+      return;
+    }
+    const { capacity: _capacity, fee: _fee, ...text } = classDraft;
     try {
       await apiFetch(path, {
         method: editingClassId ? 'PATCH' : 'POST',
-        body: JSON.stringify(classDraft),
+        body: JSON.stringify({ ...text, capacity, feeCents }),
         schema: CoopClassRecord,
       });
       setClassDraft(emptyClass);
@@ -265,10 +342,10 @@ export function CoordinatorWorkspace() {
       <header className={styles.intro}>
         <div>
           <p className={styles.eyebrow}>Kithwheel · Coordinator workspace</p>
-          <h1 className={styles.title}>Schedule desk</h1>
+          <h1 className={styles.title}>Co-op workspace</h1>
           <p className={styles.description}>
-            Arrange your co-op&apos;s classes into age-group rotations, review the saved plan, then
-            publish it when it is ready.
+            Schedules, families and registration, morning check-in, announcements, volunteer hours
+            and fees for your co-op, in one place.
           </p>
         </div>
       </header>
@@ -391,244 +468,387 @@ export function CoordinatorWorkspace() {
               </button>
             </section>
           ) : (
-            <div className={styles.columns}>
-              <aside className={styles.leftColumn} aria-label="Co-op records">
-                <section className={styles.panel} aria-labelledby="schedules-heading">
-                  <div className={styles.panelHeader}>
-                    <h2 className={styles.panelTitle} id="schedules-heading">
-                      Schedules
-                    </h2>
-                    <span className={styles.count}>{schedules.length}</span>
-                  </div>
-                  {schedules.length ? (
-                    <ul className={styles.scheduleList} aria-label="Schedule list">
-                      {schedules.map((schedule) => (
-                        <li key={schedule.id}>
-                          <button
-                            className={`${styles.scheduleChoice} ${selectedScheduleId === schedule.id ? styles.scheduleChoiceActive : ''}`}
-                            type="button"
-                            aria-pressed={selectedScheduleId === schedule.id}
-                            onClick={() => setSelectedScheduleId(schedule.id)}
-                          >
-                            <span className={styles.scheduleRow}>
-                              <span className={styles.scheduleName}>{schedule.title}</span>
-                              <span
-                                className={`${styles.status} ${schedule.status === 'published' ? styles.statusPublished : ''} ${schedule.status === 'withdrawn' ? styles.statusWithdrawn : ''}`}
-                              >
-                                {schedule.status === 'archived' ? 'Replaced' : schedule.status}
-                              </span>
-                            </span>
-                            <span className={styles.scheduleMeta}>
-                              {schedule.rotations.length}{' '}
-                              {schedule.rotations.length === 1 ? 'rotation' : 'rotations'}
-                            </span>
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <p className={styles.muted}>No schedules yet.</p>
-                  )}
-                  <form className={styles.inlineForm} onSubmit={createSchedule}>
-                    <label className={styles.smallLabel} htmlFor="schedule-name">
-                      Schedule name
-                      <input
-                        id="schedule-name"
-                        className={styles.field}
-                        value={scheduleName}
-                        onChange={(event) => setScheduleName(event.target.value)}
-                        placeholder="Name supplied by your co-op"
-                        required
-                        maxLength={120}
-                      />
-                    </label>
-                    <button className={styles.button} type="submit" disabled={!classes.length}>
-                      <CalendarDays aria-hidden="true" size={15} /> Create draft
-                    </button>
-                    {!classes.length && (
-                      <span className={styles.muted}>Add a class before creating a schedule.</span>
-                    )}
-                  </form>
-                </section>
-
-                <section className={styles.classPanel} aria-labelledby="classes-heading">
-                  <div className={styles.panelHeader}>
-                    <h2 className={styles.panelTitle} id="classes-heading">
-                      Class library
-                    </h2>
-                    <span className={styles.count}>{classes.length}</span>
-                  </div>
-                  {classes.length ? (
-                    <div className={styles.classList}>
-                      {classes.map((item) => (
-                        <button
-                          className={styles.classChoice}
-                          key={item.id}
-                          type="button"
-                          onClick={() => startClassEdit(item)}
-                          aria-label={`Edit ${item.name}`}
-                        >
-                          <span className={styles.classRow}>
-                            <span className={styles.className}>{item.name}</span>
-                            <span className={styles.muted}>Edit</span>
-                          </span>
-                          {(item.teacher || item.room || item.time) && (
-                            <span className={styles.classMeta}>
-                              {[item.teacher, item.room, item.time].filter(Boolean).join(' · ')}
-                            </span>
-                          )}
-                        </button>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className={styles.muted}>
-                      Add only the class details your co-op has provided.
-                    </p>
-                  )}
+            <>
+              {settings && (
+                <SetupChecklist
+                  coopId={coopId}
+                  settings={settings}
+                  scheduleCount={schedules.length}
+                  onGo={goTo}
+                />
+              )}
+              <nav className={tabStyles.tabs} aria-label="Co-op workspace sections">
+                {TABS.map((item) => (
                   <button
+                    key={item.id}
                     type="button"
-                    className={`${styles.quietButton} ${styles.addClassButton}`}
-                    onClick={() => {
-                      setEditingClassId(null);
-                      setConfirmingDelete(false);
-                      setClassDraft(emptyClass);
-                      setClassFormOpen((open) => !open);
-                    }}
+                    className={`${tabStyles.tab} ${tab === item.id ? tabStyles.tabActive : ''}`}
+                    aria-current={tab === item.id ? 'page' : undefined}
+                    onClick={() => goTo(item.id)}
                   >
-                    <Plus aria-hidden="true" size={15} /> Add a class
+                    {item.label}
                   </button>
-                  {classFormOpen && (
-                    <form className={styles.inlineForm} onSubmit={saveClass}>
-                      <label className={styles.smallLabel} htmlFor="class-name">
-                        Class name
-                        <input
-                          id="class-name"
-                          className={styles.field}
-                          value={classDraft.name}
-                          onChange={(event) =>
-                            setClassDraft({ ...classDraft, name: event.target.value })
-                          }
-                          required
-                          maxLength={120}
-                        />
-                      </label>
-                      <label className={styles.smallLabel} htmlFor="class-description">
-                        Description (optional)
-                        <input
-                          id="class-description"
-                          className={styles.field}
-                          value={classDraft.description}
-                          onChange={(event) =>
-                            setClassDraft({ ...classDraft, description: event.target.value })
-                          }
-                          maxLength={500}
-                        />
-                      </label>
-                      <div className={styles.optionalGrid}>
-                        <label className={styles.smallLabel} htmlFor="class-teacher">
-                          Teacher, if supplied
-                          <input
-                            id="class-teacher"
-                            className={styles.field}
-                            value={classDraft.teacher}
-                            onChange={(event) =>
-                              setClassDraft({ ...classDraft, teacher: event.target.value })
-                            }
-                            maxLength={120}
-                          />
-                        </label>
-                        <label className={styles.smallLabel} htmlFor="class-room">
-                          Room, if supplied
-                          <input
-                            id="class-room"
-                            className={styles.field}
-                            value={classDraft.room}
-                            onChange={(event) =>
-                              setClassDraft({ ...classDraft, room: event.target.value })
-                            }
-                            maxLength={120}
-                          />
-                        </label>
-                        <label className={styles.smallLabel} htmlFor="class-time">
-                          Time, if supplied
-                          <input
-                            id="class-time"
-                            className={styles.field}
-                            value={classDraft.time}
-                            onChange={(event) =>
-                              setClassDraft({ ...classDraft, time: event.target.value })
-                            }
-                            maxLength={120}
-                          />
-                        </label>
+                ))}
+              </nav>
+              {tab !== 'schedule' && !settings ? (
+                <output className={styles.loading} aria-live="polite">
+                  Loading…
+                </output>
+              ) : tab !== 'schedule' && settings ? (
+                <>
+                  {tab === 'families' && (
+                    <FamiliesPanel
+                      key={coopId}
+                      coopId={coopId}
+                      settings={settings}
+                      onSettings={setSettings}
+                    />
+                  )}
+                  {tab === 'checkin' && (
+                    <AttendancePanel
+                      key={coopId}
+                      coopId={coopId}
+                      settings={settings}
+                      onSettings={setSettings}
+                    />
+                  )}
+                  {tab === 'announcements' && (
+                    <AnnouncementsPanel key={coopId} coopId={coopId} classes={classes} />
+                  )}
+                  {tab === 'volunteer' && (
+                    <VolunteerPanel
+                      key={coopId}
+                      coopId={coopId}
+                      settings={settings}
+                      onSettings={setSettings}
+                    />
+                  )}
+                  {tab === 'fees' && (
+                    <FeesPanel
+                      key={coopId}
+                      coopId={coopId}
+                      settings={settings}
+                      onSettings={setSettings}
+                    />
+                  )}
+                  {tab === 'settings' && (
+                    <SettingsPanel
+                      key={coopId}
+                      coopId={coopId}
+                      settings={settings}
+                      onSettings={setSettings}
+                      onLeft={() => {
+                        goTo('schedule');
+                        void loadCoops();
+                      }}
+                    />
+                  )}
+                </>
+              ) : (
+                <div className={styles.columns}>
+                  <aside className={styles.leftColumn} aria-label="Co-op records">
+                    <section className={styles.panel} aria-labelledby="schedules-heading">
+                      <div className={styles.panelHeader}>
+                        <h2 className={styles.panelTitle} id="schedules-heading">
+                          Schedules
+                        </h2>
+                        <span className={styles.count}>{schedules.length}</span>
                       </div>
-                      <div className={styles.buttonRow}>
-                        <button className={styles.button} type="submit">
-                          {editingClassId ? 'Save class details' : 'Create class'}
+                      {schedules.length ? (
+                        <ul className={styles.scheduleList} aria-label="Schedule list">
+                          {schedules.map((schedule) => (
+                            <li key={schedule.id}>
+                              <button
+                                className={`${styles.scheduleChoice} ${selectedScheduleId === schedule.id ? styles.scheduleChoiceActive : ''}`}
+                                type="button"
+                                aria-pressed={selectedScheduleId === schedule.id}
+                                onClick={() => setSelectedScheduleId(schedule.id)}
+                              >
+                                <span className={styles.scheduleRow}>
+                                  <span className={styles.scheduleName}>{schedule.title}</span>
+                                  <span
+                                    className={`${styles.status} ${schedule.status === 'published' ? styles.statusPublished : ''} ${schedule.status === 'withdrawn' ? styles.statusWithdrawn : ''}`}
+                                  >
+                                    {schedule.status === 'archived' ? 'Replaced' : schedule.status}
+                                  </span>
+                                </span>
+                                <span className={styles.scheduleMeta}>
+                                  {schedule.rotations.length}{' '}
+                                  {schedule.rotations.length === 1 ? 'rotation' : 'rotations'}
+                                </span>
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className={styles.muted}>No schedules yet.</p>
+                      )}
+                      <form className={styles.inlineForm} onSubmit={createSchedule}>
+                        <label className={styles.smallLabel} htmlFor="schedule-name">
+                          Schedule name
+                          <input
+                            id="schedule-name"
+                            className={styles.field}
+                            value={scheduleName}
+                            onChange={(event) => setScheduleName(event.target.value)}
+                            placeholder="Name supplied by your co-op"
+                            required
+                            maxLength={120}
+                          />
+                        </label>
+                        <button className={styles.button} type="submit" disabled={!classes.length}>
+                          <CalendarDays aria-hidden="true" size={15} /> Create draft
                         </button>
-                        <button
-                          className={styles.quietButton}
-                          type="button"
-                          onClick={() => {
-                            setClassFormOpen(false);
-                            setEditingClassId(null);
-                            setConfirmingDelete(false);
-                            setClassDraft(emptyClass);
-                          }}
-                        >
-                          Cancel
-                        </button>
-                        {editingClassId && !confirmingDelete && (
-                          <button
-                            className={styles.dangerButton}
-                            type="button"
-                            onClick={() => setConfirmingDelete(true)}
-                          >
-                            <Trash2 aria-hidden="true" size={14} /> Delete class
-                          </button>
+                        {!classes.length && (
+                          <span className={styles.muted}>
+                            Add a class before creating a schedule.
+                          </span>
                         )}
+                      </form>
+                      {selectedSchedule && (
+                        <button
+                          className={`${styles.quietButton} ${styles.addClassButton}`}
+                          type="button"
+                          disabled={copying}
+                          onClick={() => void copySchedule(selectedSchedule)}
+                        >
+                          <Copy aria-hidden="true" size={14} /> Copy “{selectedSchedule.title}” to a
+                          new draft
+                        </button>
+                      )}
+                    </section>
+
+                    <section className={styles.classPanel} aria-labelledby="classes-heading">
+                      <div className={styles.panelHeader}>
+                        <h2 className={styles.panelTitle} id="classes-heading">
+                          Class library
+                        </h2>
+                        <span className={styles.count}>{classes.length}</span>
                       </div>
-                      {editingClassId && confirmingDelete && (
-                        <div className={styles.confirmBox} role="alert">
-                          <p className={styles.confirmText}>
-                            Delete “{classDraft.name || 'this class'}”? This can’t be undone.
-                            {draftsUsingEditingClass > 0 &&
-                              ` It will also be removed from ${draftsUsingEditingClass} unpublished ${draftsUsingEditingClass === 1 ? 'schedule' : 'schedules'}.`}
-                          </p>
-                          <div className={styles.buttonRow}>
+                      {classes.length ? (
+                        <div className={styles.classList}>
+                          {classes.map((item) => (
                             <button
-                              className={styles.dangerButtonSolid}
+                              className={styles.classChoice}
+                              key={item.id}
                               type="button"
-                              disabled={deleting}
-                              onClick={() => void deleteClass()}
+                              onClick={() => startClassEdit(item)}
+                              aria-label={`Edit ${item.name}`}
                             >
-                              {deleting ? 'Deleting…' : 'Yes, delete class'}
+                              <span className={styles.classRow}>
+                                <span className={styles.className}>{item.name}</span>
+                                <span className={styles.muted}>Edit</span>
+                              </span>
+                              {(item.teacher || item.room || item.time) && (
+                                <span className={styles.classMeta}>
+                                  {[item.teacher, item.room, item.time].filter(Boolean).join(' · ')}
+                                </span>
+                              )}
+                            </button>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className={styles.muted}>
+                          Add only the class details your co-op has provided.
+                        </p>
+                      )}
+                      <button
+                        type="button"
+                        className={`${styles.quietButton} ${styles.addClassButton}`}
+                        onClick={() => {
+                          setEditingClassId(null);
+                          setConfirmingDelete(false);
+                          setClassDraft(emptyClass);
+                          setClassFormOpen((open) => !open);
+                        }}
+                      >
+                        <Plus aria-hidden="true" size={15} /> Add a class
+                      </button>
+                      <button
+                        type="button"
+                        className={`${styles.quietButton} ${styles.addClassButton}`}
+                        onClick={() => setImportOpen((open) => !open)}
+                      >
+                        <FileUp aria-hidden="true" size={15} /> Import from a spreadsheet
+                      </button>
+                      {importOpen && (
+                        <ClassImport
+                          coopId={coopId}
+                          onImported={refreshCurrentCoop}
+                          onClose={() => setImportOpen(false)}
+                        />
+                      )}
+                      {classFormOpen && (
+                        <form className={styles.inlineForm} onSubmit={saveClass}>
+                          <label className={styles.smallLabel} htmlFor="class-name">
+                            Class name
+                            <input
+                              id="class-name"
+                              className={styles.field}
+                              value={classDraft.name}
+                              onChange={(event) =>
+                                setClassDraft({ ...classDraft, name: event.target.value })
+                              }
+                              required
+                              maxLength={120}
+                            />
+                          </label>
+                          <label className={styles.smallLabel} htmlFor="class-description">
+                            Description (optional)
+                            <input
+                              id="class-description"
+                              className={styles.field}
+                              value={classDraft.description}
+                              onChange={(event) =>
+                                setClassDraft({ ...classDraft, description: event.target.value })
+                              }
+                              maxLength={500}
+                            />
+                          </label>
+                          <div className={styles.optionalGrid}>
+                            <label className={styles.smallLabel} htmlFor="class-teacher">
+                              Teacher, if supplied
+                              <input
+                                id="class-teacher"
+                                className={styles.field}
+                                value={classDraft.teacher}
+                                onChange={(event) =>
+                                  setClassDraft({ ...classDraft, teacher: event.target.value })
+                                }
+                                maxLength={120}
+                              />
+                            </label>
+                            <label className={styles.smallLabel} htmlFor="class-room">
+                              Room, if supplied
+                              <input
+                                id="class-room"
+                                className={styles.field}
+                                value={classDraft.room}
+                                onChange={(event) =>
+                                  setClassDraft({ ...classDraft, room: event.target.value })
+                                }
+                                maxLength={120}
+                              />
+                            </label>
+                            <label className={styles.smallLabel} htmlFor="class-time">
+                              Time, if supplied
+                              <input
+                                id="class-time"
+                                className={styles.field}
+                                value={classDraft.time}
+                                onChange={(event) =>
+                                  setClassDraft({ ...classDraft, time: event.target.value })
+                                }
+                                maxLength={120}
+                              />
+                            </label>
+                            <label className={styles.smallLabel} htmlFor="class-capacity">
+                              Seats (empty = no limit)
+                              <input
+                                id="class-capacity"
+                                className={styles.field}
+                                inputMode="numeric"
+                                value={classDraft.capacity}
+                                onChange={(event) =>
+                                  setClassDraft({ ...classDraft, capacity: event.target.value })
+                                }
+                              />
+                            </label>
+                            <label className={styles.smallLabel} htmlFor="class-fee">
+                              Class fee ($, optional)
+                              <input
+                                id="class-fee"
+                                className={styles.field}
+                                inputMode="decimal"
+                                value={classDraft.fee}
+                                onChange={(event) =>
+                                  setClassDraft({ ...classDraft, fee: event.target.value })
+                                }
+                              />
+                            </label>
+                          </div>
+                          <label className={styles.smallLabel} htmlFor="class-materials">
+                            Materials list (optional, shown to families)
+                            <textarea
+                              id="class-materials"
+                              className={styles.field}
+                              style={{ minHeight: 64, paddingTop: 8 }}
+                              value={classDraft.materials}
+                              onChange={(event) =>
+                                setClassDraft({ ...classDraft, materials: event.target.value })
+                              }
+                              maxLength={1000}
+                            />
+                          </label>
+                          <div className={styles.buttonRow}>
+                            <button className={styles.button} type="submit">
+                              {editingClassId ? 'Save class details' : 'Create class'}
                             </button>
                             <button
                               className={styles.quietButton}
                               type="button"
-                              disabled={deleting}
-                              onClick={() => setConfirmingDelete(false)}
+                              onClick={() => {
+                                setClassFormOpen(false);
+                                setEditingClassId(null);
+                                setConfirmingDelete(false);
+                                setClassDraft(emptyClass);
+                              }}
                             >
-                              Keep it
+                              Cancel
                             </button>
+                            {editingClassId && !confirmingDelete && (
+                              <button
+                                className={styles.dangerButton}
+                                type="button"
+                                onClick={() => setConfirmingDelete(true)}
+                              >
+                                <Trash2 aria-hidden="true" size={14} /> Delete class
+                              </button>
+                            )}
                           </div>
-                        </div>
+                          {editingClassId && confirmingDelete && (
+                            <div className={styles.confirmBox} role="alert">
+                              <p className={styles.confirmText}>
+                                Delete “{classDraft.name || 'this class'}”? This can’t be undone.
+                                {draftsUsingEditingClass > 0 &&
+                                  ` It will also be removed from ${draftsUsingEditingClass} unpublished ${draftsUsingEditingClass === 1 ? 'schedule' : 'schedules'}.`}
+                              </p>
+                              <div className={styles.buttonRow}>
+                                <button
+                                  className={styles.dangerButtonSolid}
+                                  type="button"
+                                  disabled={deleting}
+                                  onClick={() => void deleteClass()}
+                                >
+                                  {deleting ? 'Deleting…' : 'Yes, delete class'}
+                                </button>
+                                <button
+                                  className={styles.quietButton}
+                                  type="button"
+                                  disabled={deleting}
+                                  onClick={() => setConfirmingDelete(false)}
+                                >
+                                  Keep it
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </form>
                       )}
-                    </form>
-                  )}
-                </section>
-              </aside>
+                    </section>
+                  </aside>
 
-              <section className={styles.panel} aria-label="Selected schedule">
-                <ScheduleEditor
-                  coopId={coopId}
-                  schedule={selectedSchedule}
-                  classes={classes}
-                  onRefresh={refreshCurrentCoop}
-                />
-              </section>
-            </div>
+                  <section className={styles.panel} aria-label="Selected schedule">
+                    <ScheduleEditor
+                      coopId={coopId}
+                      schedule={selectedSchedule}
+                      classes={classes}
+                      onRefresh={refreshCurrentCoop}
+                    />
+                  </section>
+                </div>
+              )}
+            </>
           )}
         </>
       )}

@@ -15,7 +15,7 @@ export async function GET() {
   if (!session?.user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
   const coops = await prisma.coop.findMany({
-    where: { createdByUserId: session.user.id },
+    where: { memberships: { some: { userId: session.user.id, role: 'coordinator' } } },
     select: { id: true, name: true },
     orderBy: { createdAt: 'asc' },
   });

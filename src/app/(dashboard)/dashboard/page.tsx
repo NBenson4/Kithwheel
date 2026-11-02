@@ -3,8 +3,9 @@ import type { Metadata } from 'next';
 import { CoordinatorWorkspace } from '@/components/custom/scheduling/coordinator-workspace';
 
 export const metadata: Metadata = {
-  title: 'Co-op schedules | Kithwheel',
-  description: 'Create, review, publish, and withdraw your co-op class schedules.',
+  title: 'Co-op workspace | Kithwheel',
+  description:
+    'Schedules, families, check-in, announcements, volunteer hours and fees for your co-op.',
 };
 
 export default function DashboardPage() {

@@ -118,3 +118,116 @@ export function notificationEmail(input: {
   const { html, text } = renderEmail({ heading: input.title, body: input.lines, cta: input.cta });
   return { subject: input.subject, html, text };
 }
+
+// ─── Co-op coordination ───
+
+/** Invitation for another coordinator to share a co-op workspace. */
+export function coordinatorInviteEmail(input: {
+  coopName: string;
+  invitedBy: string;
+  url: string;
+}): EmailContent {
+  const { html, text } = renderEmail({
+    heading: `Join ${input.coopName} on Kithwheel`,
+    body: [
+      `${input.invitedBy} invited you to help coordinate ${input.coopName} on Kithwheel, where the co-op keeps its schedule, registration, announcements, fees and volunteer hours.`,
+      'Open the link to accept. If you don’t have a Kithwheel account yet, you can create one with this email address. The invitation expires in 14 days.',
+    ],
+    cta: { label: 'Accept invitation', url: input.url },
+    footer: 'If you weren’t expecting this, you can ignore this email.',
+  });
+  return { subject: `${input.invitedBy} invited you to coordinate ${input.coopName}`, html, text };
+}
+
+type Placement = { childName: string; className: string };
+
+/** Sent to a family after they register (or a coordinator adds them). */
+export function familyWelcomeEmail(input: {
+  coopName: string;
+  parentName: string;
+  url: string;
+  enrolled: Placement[];
+  waitlisted: Placement[];
+}): EmailContent {
+  const enrolled = input.enrolled.map((item) => `• ${item.childName}: ${item.className}`);
+  const waitlisted = input.waitlisted.map(
+    (item) => `• ${item.childName}: ${item.className} (waitlist)`,
+  );
+  const { html, text } = renderEmail({
+    heading: `You’re registered with ${input.coopName}`,
+    body: [
+      `Hi ${input.parentName}, thanks for registering.`,
+      ...(enrolled.length ? ['Classes:', ...enrolled] : []),
+      ...(waitlisted.length
+        ? ['Waitlisted (we’ll email you if a seat opens):', ...waitlisted]
+        : []),
+      'Your family page has the schedule, materials lists, announcements, fees and volunteer hours. Keep this link private; anyone with it can see your family’s page.',
+    ],
+    cta: { label: 'Open your family page', url: input.url },
+    footer: `You received this because you registered with ${input.coopName} on Kithwheel.`,
+  });
+  return { subject: `Registration confirmed: ${input.coopName}`, html, text };
+}
+
+/** Re-sends a family's private link. */
+export function familyLinkEmail(input: {
+  coopName: string;
+  parentName: string;
+  url: string;
+}): EmailContent {
+  const { html, text } = renderEmail({
+    heading: `Your ${input.coopName} family page`,
+    body: [
+      `Hi ${input.parentName}, here is the link to your family page for ${input.coopName}.`,
+      'Keep it private; anyone with the link can see your family’s page.',
+    ],
+    cta: { label: 'Open your family page', url: input.url },
+    footer: `You received this because your family is registered with ${input.coopName} on Kithwheel.`,
+  });
+  return { subject: `Your ${input.coopName} family page`, html, text };
+}
+
+/** A waitlisted child got a seat. */
+export function seatOpenedEmail(input: {
+  coopName: string;
+  parentName: string;
+  childName: string;
+  className: string;
+  url: string;
+}): EmailContent {
+  const { html, text } = renderEmail({
+    heading: `${input.childName} is in ${input.className}`,
+    body: [
+      `Hi ${input.parentName}, a seat opened in ${input.className} at ${input.coopName}, and ${input.childName} has moved off the waitlist into the class.`,
+      'If you no longer need the seat, you can drop the class from your family page so the next family can have it.',
+    ],
+    cta: { label: 'Open your family page', url: input.url },
+    footer: `You received this because your family is registered with ${input.coopName} on Kithwheel.`,
+  });
+  return { subject: `A seat opened: ${input.className}`, html, text };
+}
+
+/** A coordinator's announcement to families. */
+export function announcementEmail(input: {
+  coopName: string;
+  title: string;
+  body: string;
+  className: string | null;
+  url: string;
+}): EmailContent {
+  const paragraphs = input.body
+    .split(/\n{2,}/)
+    .map((paragraph) => paragraph.trim())
+    .filter(Boolean);
+  const { html, text } = renderEmail({
+    heading: input.title,
+    body: [...(input.className ? [`For families in ${input.className}`] : []), ...paragraphs],
+    cta: { label: 'Open your family page', url: input.url },
+    footer: `Sent by ${input.coopName} through Kithwheel.`,
+  });
+  return {
+    subject: `${input.coopName}: ${input.title}`,
+    html: html.replace(/\n/g, '<br>'),
+    text,
+  };
+}

@@ -1,24 +1,182 @@
 // Co-op records and coordinator-managed schedules.
 model Coop {
-  id                   String           @id @default(cuid())
-  name                 String
-  createdByUserId      String
-  currentScheduleId    String?
+  id                       String             @id @default(cuid())
+  name                     String
+  createdByUserId          String
+  currentScheduleId        String?
   // Billing. The free trial is tracked here; Stripe is only involved once a co-op subscribes.
-  trialEndsAt          DateTime         @default(dbgenerated("(now() + '30 days'::interval)"))
-  stripeCustomerId     String?          @unique
-  stripeSubscriptionId String?          @unique
+  trialEndsAt              DateTime           @default(dbgenerated("(now() + '30 days'::interval)"))
+  stripeCustomerId         String?            @unique
+  stripeSubscriptionId     String?            @unique
   // Stripe subscription status (active, trialing, past_due, canceled, unpaid, ...).
-  subscriptionStatus   String?
+  subscriptionStatus       String?
   // Billing interval of the subscribed price: "month" or "year".
-  subscriptionInterval String?
-  currentPeriodEnd     DateTime?
-  cancelAtPeriodEnd    Boolean          @default(false)
-  createdAt            DateTime         @default(now())
-  updatedAt            DateTime         @updatedAt
-  memberships          CoopMembership[]
-  classes              CoopClass[]
-  schedules            CoopSchedule[]
+  subscriptionInterval     String?
+  currentPeriodEnd         DateTime?
+  cancelAtPeriodEnd        Boolean            @default(false)
+  // Private link families use to see the schedule and register (no account needed).
+  shareToken               String?            @unique
+  registrationOpen         Boolean            @default(false)
+  registrationNote         String?
+  // Calendar feed: the weekly co-op day (0 = Sunday) between the term dates, in this time zone.
+  timeZone                 String             @default("America/New_York")
+  meetingDay               Int?
+  termStart                DateTime?          @db.Date
+  termEnd                  DateTime?          @db.Date
+  // Fees the co-op charges each family and each child, in cents. Class fees live on the class.
+  familyFeeCents           Int                @default(0)
+  childFeeCents            Int                @default(0)
+  paymentInstructions      String?
+  volunteerMinutesRequired Int?
+  createdAt                DateTime           @default(now())
+  updatedAt                DateTime           @updatedAt
+  memberships              CoopMembership[]
+  classes                  CoopClass[]
+  schedules                CoopSchedule[]
+  invites                  CoopInvite[]
+  families                 CoopFamily[]
+  announcements            CoopAnnouncement[]
+  // Private link for the check-in tablet at the door.
+  kioskToken               String?            @unique
+}
+
+// Invitation for another coordinator. Only a hash of the emailed token is stored.
+model CoopInvite {
+  id               String    @id @default(cuid())
+  coopId           String
+  email            String
+  tokenHash        String    @unique
+  invitedByUserId  String
+  createdAt        DateTime  @default(now())
+  expiresAt        DateTime
+  acceptedAt       DateTime?
+  acceptedByUserId String?
+  coop             Coop      @relation(fields: [coopId], references: [id], onDelete: Cascade)
+
+  @@index([coopId, acceptedAt])
+}
+
+// A registered family. Families use a private link (accessToken) instead of an account.
+model CoopFamily {
+  id            String              @id @default(cuid())
+  coopId        String
+  parentName    String
+  email         String
+  phone         String?
+  notes         String?
+  accessToken   String              @unique
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+  coop          Coop                @relation(fields: [coopId], references: [id], onDelete: Cascade)
+  children      CoopChild[]
+  charges       CoopFamilyCharge[]
+  payments      CoopFamilyPayment[]
+  volunteerLogs CoopVolunteerLog[]
+
+  @@unique([coopId, email])
+  @@index([coopId, parentName])
+}
+
+model CoopChild {
+  id          String           @id @default(cuid())
+  coopId      String
+  familyId    String
+  name        String
+  ageGroup    String?
+  createdAt   DateTime         @default(now())
+  family      CoopFamily       @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  enrollments CoopEnrollment[]
+  attendance  CoopAttendance[]
+
+  @@index([familyId])
+}
+
+model CoopEnrollment {
+  id         String               @id @default(cuid())
+  coopId     String
+  childId    String
+  classId    String
+  status     CoopEnrollmentStatus @default(ENROLLED)
+  createdAt  DateTime             @default(now())
+  promotedAt DateTime?
+  child      CoopChild            @relation(fields: [childId], references: [id], onDelete: Cascade)
+  class      CoopClass            @relation(fields: [classId], references: [id], onDelete: Cascade)
+
+  @@unique([childId, classId])
+  @@index([classId, status, createdAt])
+  @@index([coopId])
+}
+
+enum CoopEnrollmentStatus {
+  ENROLLED
+  WAITLISTED
+}
+
+model CoopAnnouncement {
+  id              String     @id @default(cuid())
+  coopId          String
+  // Null means every family; otherwise families with a child enrolled in this class.
+  classId         String?
+  title           String
+  body            String
+  createdByUserId String
+  recipientCount  Int        @default(0)
+  createdAt       DateTime   @default(now())
+  coop            Coop       @relation(fields: [coopId], references: [id], onDelete: Cascade)
+  class           CoopClass? @relation(fields: [classId], references: [id], onDelete: SetNull)
+
+  @@index([coopId, createdAt])
+}
+
+model CoopVolunteerLog {
+  id                 String              @id @default(cuid())
+  coopId             String
+  familyId           String
+  date               DateTime            @db.Date
+  minutes            Int
+  description        String
+  status             CoopVolunteerStatus @default(PENDING)
+  addedByCoordinator Boolean             @default(false)
+  reviewedAt         DateTime?
+  createdAt          DateTime            @default(now())
+  family             CoopFamily          @relation(fields: [familyId], references: [id], onDelete: Cascade)
+
+  @@index([coopId, status])
+  @@index([familyId])
+}
+
+enum CoopVolunteerStatus {
+  PENDING
+  APPROVED
+  DECLINED
+}
+
+// One-off charge or (negative) discount on a family's balance.
+model CoopFamilyCharge {
+  id          String     @id @default(cuid())
+  coopId      String
+  familyId    String
+  description String
+  amountCents Int
+  createdAt   DateTime   @default(now())
+  family      CoopFamily @relation(fields: [familyId], references: [id], onDelete: Cascade)
+
+  @@index([familyId])
+}
+
+// A payment recorded by a coordinator (cash, check, Venmo...).
+model CoopFamilyPayment {
+  id          String     @id @default(cuid())
+  coopId      String
+  familyId    String
+  amountCents Int
+  method      String
+  note        String?
+  paidOn      DateTime   @db.Date
+  createdAt   DateTime   @default(now())
+  family      CoopFamily @relation(fields: [familyId], references: [id], onDelete: Cascade)
+
+  @@index([familyId])
 }
 
 model CoopMembership {
@@ -41,10 +199,16 @@ model CoopClass {
   teacher         String?
   room            String?
   time            String?
+  // Seats; null means no limit. Extra sign-ups join the waitlist.
+  capacity        Int?
+  feeCents        Int                 @default(0)
+  materials       String?
   createdAt       DateTime            @default(now())
   updatedAt       DateTime            @updatedAt
   coop            Coop                @relation(fields: [coopId], references: [id], onDelete: Cascade)
   scheduleEntries CoopScheduleEntry[]
+  enrollments     CoopEnrollment[]
+  announcements   CoopAnnouncement[]
 
   @@index([coopId, name])
 }
@@ -100,4 +264,27 @@ model StripeEvent {
   id          String   @id
   type        String
   processedAt DateTime @default(now())
+}
+
+// One child's attendance on one co-op day.
+model CoopAttendance {
+  id           String               @id @default(cuid())
+  coopId       String
+  childId      String
+  date         DateTime             @db.Date
+  status       CoopAttendanceStatus
+  checkedInAt  DateTime?
+  checkedOutAt DateTime?
+  // "coordinator" or "kiosk"
+  source       String               @default("coordinator")
+  updatedAt    DateTime             @updatedAt
+  child        CoopChild            @relation(fields: [childId], references: [id], onDelete: Cascade)
+
+  @@unique([childId, date])
+  @@index([coopId, date])
+}
+
+enum CoopAttendanceStatus {
+  PRESENT
+  ABSENT
 }

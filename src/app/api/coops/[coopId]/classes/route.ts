@@ -37,6 +37,9 @@ export async function POST(request: Request, context: RouteContext) {
         teacher: parsed.data.teacher || null,
         room: parsed.data.room || null,
         time: parsed.data.time || null,
+        capacity: parsed.data.capacity ?? null,
+        feeCents: parsed.data.feeCents ?? 0,
+        materials: parsed.data.materials || null,
       },
     });
     return NextResponse.json(CoopClassList.shape.items.element.parse(created), { status: 201 });

@@ -20,6 +20,9 @@ export const CoopClassRecord = z.object({
   teacher: z.string().nullable(),
   room: z.string().nullable(),
   time: z.string().nullable(),
+  capacity: z.number().int().nullable(),
+  feeCents: z.number().int(),
+  materials: z.string().nullable(),
 });
 
 export const CoopClassList = z.object({ items: z.array(CoopClassRecord) });
@@ -32,6 +35,9 @@ export const CoopClassCreate = z.object({
   teacher: z.string().trim().max(120, 'Teacher name is too long').optional(),
   room: z.string().trim().max(120, 'Room is too long').optional(),
   time: z.string().trim().max(120, 'Time is too long').optional(),
+  capacity: z.number().int().min(1, 'Capacity must be at least 1').max(1000).nullable().optional(),
+  feeCents: z.number().int().min(0, 'Fee can’t be negative').max(10_000_000).optional(),
+  materials: z.string().trim().max(1000, 'Materials list is too long').optional(),
 });
 
 export const CoopClassUpdate = CoopClassCreate.partial().refine(

@@ -106,7 +106,7 @@ test('a coordinator signs up, creates a private workspace, uses Account, signs o
 
   await page.getByLabel('Co-op name').fill('Cedar Grove Co-op');
   await page.getByRole('button', { name: 'Create co-op' }).click();
-  await expect(page.getByRole('heading', { name: 'Schedule desk' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Co-op workspace' })).toBeVisible();
   await expect(page.getByRole('option', { name: 'Cedar Grove Co-op' })).toBeAttached();
   await expect(page.getByRole('button', { name: 'Sign out' })).toHaveCount(0);
   await expect(page.locator('.kw-product-header')).toHaveCSS('position', 'sticky');
@@ -139,7 +139,7 @@ test('a coordinator signs up, creates a private workspace, uses Account, signs o
 
   await page.getByRole('button', { name: 'Open product navigation' }).click();
   await page.getByRole('dialog').getByRole('link', { name: 'Workspace' }).click();
-  await expect(page.getByRole('heading', { name: 'Schedule desk' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Co-op workspace' })).toBeVisible();
   await page.getByRole('button', { name: 'Open product navigation' }).click();
   await page.getByRole('dialog').getByRole('link', { name: 'Account' }).click();
   await expect(page.getByRole('heading', { name: 'Account' })).toBeVisible();
@@ -192,7 +192,7 @@ test('a second authenticated coordinator cannot read or change another coordinat
     await expect(page).toHaveURL(/\/dashboard$/);
     await page.getByLabel('Co-op name').fill(workspaceName);
     await page.getByRole('button', { name: 'Create co-op' }).click();
-    await expect(page.getByRole('heading', { name: 'Schedule desk' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Co-op workspace' })).toBeVisible();
     await expect(page.getByRole('option', { name: workspaceName })).toBeAttached();
 
     const ownerSessionResponse = await page.request.get('/api/auth/get-session', {
@@ -323,7 +323,7 @@ test('Workspace explains denied record reads and recovers when ownership is rest
   await expect(page).toHaveURL(/\/dashboard$/);
   await page.getByLabel('Co-op name').fill(firstCoop);
   await page.getByRole('button', { name: 'Create co-op' }).click();
-  await expect(page.getByRole('heading', { name: 'Schedule desk' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Co-op workspace' })).toBeVisible();
   await page.getByRole('button', { name: 'Add co-op' }).click();
   await page.getByLabel('Co-op name', { exact: true }).fill(secondCoop);
   await page.getByRole('button', { name: 'Create', exact: true }).click();
@@ -352,11 +352,13 @@ test('Workspace explains denied record reads and recovers when ownership is rest
   await firstRead;
   await expect(page.getByText('No schedules yet.')).toBeVisible();
 
-  const foreignOwnerId = `foreign-${randomUUID()}`;
-  await prisma.coop.update({
-    where: { id: secondWorkspace.id },
-    data: { createdByUserId: foreignOwnerId },
-  });
+  // Access comes from coordinator membership, so revoking it means changing the role.
+  const setRole = (role: string) =>
+    prisma.coopMembership.updateMany({
+      where: { coopId: secondWorkspace.id, userId: secondWorkspace.createdByUserId },
+      data: { role },
+    });
+  await setRole('former');
   try {
     const forbiddenRead = await page.request.get(`/api/coops/${secondWorkspace.id}/classes`);
     expect(forbiddenRead.status()).toBe(403);
@@ -372,10 +374,7 @@ test('Workspace explains denied record reads and recovers when ownership is rest
     await expect(recordError).toBeVisible();
     await expect(page.getByRole('button', { name: 'Try again' })).toBeVisible();
 
-    await prisma.coop.update({
-      where: { id: secondWorkspace.id },
-      data: { createdByUserId: secondWorkspace.createdByUserId },
-    });
+    await setRole('coordinator');
     const retryClassRead = page.waitForResponse(
       (response) =>
         response.url().endsWith(`/api/coops/${secondWorkspace.id}/classes`) &&
@@ -386,10 +385,7 @@ test('Workspace explains denied record reads and recovers when ownership is rest
     await expect(recordError).toHaveCount(0);
     await expect(page.getByText('No schedules yet.')).toBeVisible();
   } finally {
-    await prisma.coop.update({
-      where: { id: secondWorkspace.id },
-      data: { createdByUserId: secondWorkspace.createdByUserId },
-    });
+    await setRole('coordinator');
   }
 });
 

@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { signUp } from '@/lib/auth-client';
+import { nextPath } from '@/lib/next-path';
 
 // Email + password sign-up. Composes the template's base shadcn primitives
 // (Button/Input/Label) styled through the theme tokens. Restyle freely — this
@@ -28,13 +29,13 @@ export function SignUpForm() {
         name,
         email,
         password,
-        callbackURL: '/dashboard',
+        callbackURL: nextPath(),
       });
       if (signUpError) {
         setError(signUpError.message ?? 'Could not create your account. Try again.');
         return;
       }
-      window.location.assign('/dashboard');
+      window.location.assign(nextPath());
     } catch {
       setError('We could not create your account. Please try again.');
     } finally {
@@ -95,7 +96,7 @@ export function SignUpForm() {
       <Button type="submit" disabled={pending} className="w-full">
         {pending ? 'Creating account…' : 'Create account'}
       </Button>
-      <GoogleSignInButton callbackURL="/dashboard" />
+      <GoogleSignInButton callbackURL={nextPath()} />
     </form>
   );
 }

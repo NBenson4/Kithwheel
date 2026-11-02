@@ -106,7 +106,12 @@ function hasOwnNavigation(pathname: string) {
     pathname === '/profile' ||
     pathname === '/forgot-password' ||
     pathname === '/reset-password' ||
-    pathname.startsWith('/reset-password/')
+    pathname.startsWith('/reset-password/') ||
+    // Family pages, the co-op link, the check-in tablet and invitations have their own headers.
+    pathname.startsWith('/c/') ||
+    pathname.startsWith('/f/') ||
+    pathname.startsWith('/k/') ||
+    pathname.startsWith('/invite/')
   );
 }
 

@@ -2,6 +2,7 @@
 import 'server-only';
 import { NextResponse } from 'next/server';
 import { requireCoopEditor } from '@/lib/business/coordinator-auth';
+import { fillOpenSeats, notifyPromotions } from '@/lib/business/families';
 import { CoopClassList, CoopClassUpdate, DeletedRecord } from '@/lib/contracts/coops';
 import { prisma } from '@/lib/db';
 import { sameOrigin } from '@/lib/same-origin';
@@ -26,9 +27,20 @@ export async function PATCH(request: Request, context: RouteContext) {
       ...(parsed.data.teacher !== undefined ? { teacher: parsed.data.teacher || null } : {}),
       ...(parsed.data.room !== undefined ? { room: parsed.data.room || null } : {}),
       ...(parsed.data.time !== undefined ? { time: parsed.data.time || null } : {}),
+      ...(parsed.data.capacity !== undefined ? { capacity: parsed.data.capacity } : {}),
+      ...(parsed.data.feeCents !== undefined ? { feeCents: parsed.data.feeCents } : {}),
+      ...(parsed.data.materials !== undefined ? { materials: parsed.data.materials || null } : {}),
     };
-    const result = await prisma.coopClass.updateMany({ where: { id: classId, coopId }, data });
-    if (result.count === 0) return NextResponse.json({ error: 'class_not_found' }, { status: 404 });
+    // A larger (or removed) capacity lets waitlisted children in.
+    const promotions = await prisma.$transaction(async (tx) => {
+      const result = await tx.coopClass.updateMany({ where: { id: classId, coopId }, data });
+      if (result.count === 0) return null;
+      return parsed.data.capacity !== undefined ? fillOpenSeats(tx, [classId]) : [];
+    });
+    if (promotions === null) {
+      return NextResponse.json({ error: 'class_not_found' }, { status: 404 });
+    }
+    await notifyPromotions(promotions);
     const updated = await prisma.coopClass.findFirst({ where: { id: classId, coopId } });
     if (!updated) return NextResponse.json({ error: 'class_not_found' }, { status: 404 });
     return NextResponse.json(CoopClassList.shape.items.element.parse(updated));
