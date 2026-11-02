@@ -1,4 +1,4 @@
-// @polsia:user-owned — the co-op boundary used by every coordinator API route.
+// The co-op boundary used by every coordinator API route.
 import 'server-only';
 import { headers } from 'next/headers';
 import { NextResponse } from 'next/server';

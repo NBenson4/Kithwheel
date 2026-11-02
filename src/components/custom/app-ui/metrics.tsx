@@ -1,4 +1,3 @@
-// @polsia:user-owned
 import type { ReactNode } from 'react';
 
 export function MetricGrid({ children, label }: { children: ReactNode; label: string }) {

@@ -1,4 +1,4 @@
-// @polsia:user-owned — Kithwheel's co-op schedule desk.
+// Kithwheel's co-op schedule desk.
 'use client';
 
 import { CalendarDays, Plus, School } from 'lucide-react';

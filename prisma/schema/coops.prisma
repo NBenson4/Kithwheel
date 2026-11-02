@@ -1,4 +1,4 @@
-// @polsia:user-owned — co-op records and coordinator-managed schedules.
+// Co-op records and coordinator-managed schedules.
 model Coop {
   id                String           @id @default(cuid())
   name              String

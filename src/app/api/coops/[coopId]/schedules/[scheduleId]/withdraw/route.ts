@@ -1,4 +1,4 @@
-// @polsia:user-owned — withdraw a schedule and clear the co-op's current pointer.
+// Withdraw a schedule and clear the co-op's current pointer.
 import 'server-only';
 import { NextResponse } from 'next/server';
 import { requireCoopCoordinator } from '@/lib/business/coordinator-auth';

@@ -1,4 +1,4 @@
-// @polsia:user-owned — coordinator-owned schedule list and draft creation.
+// Coordinator-owned schedule list and draft creation.
 import 'server-only';
 import { NextResponse } from 'next/server';
 import { requireCoopCoordinator } from '@/lib/business/coordinator-auth';

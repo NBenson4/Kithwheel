@@ -1,4 +1,3 @@
-// @polsia:user-owned
 import { renderToStaticMarkup } from 'react-dom/server';
 import { afterAll, describe, expect, it, vi } from 'vitest';
 

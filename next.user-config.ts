@@ -1,4 +1,4 @@
-// @polsia:user-owned — your Next.js customizations, merged into next.config.ts by the
+// Your Next.js customizations, merged into next.config.ts by the
 // framework. Edit freely (no slot markers). next.config.ts stays framework-owned: don't
 // put security headers / CSP / a full `images` block here.
 import type { NextConfig } from 'next';
@@ -59,7 +59,7 @@ export type ConfigPlugin = (config: NextConfig) => NextConfig;
  * bundle-analyzer). Each entry is a `(config) => config` wrapper — pre-bind
  * options. next.config.ts applies these and re-asserts the security headers
  * afterward, so a plugin can extend the build but never drop the day-1 posture.
- * For i18n, install the `i18n` module and add its plugin here per its AGENT.md.
+ * For i18n, add the i18n library's Next plugin here.
  *
  *   export const userConfigPlugins: ConfigPlugin[] = [
  *     createNextIntlPlugin('./src/i18n/request.ts'),

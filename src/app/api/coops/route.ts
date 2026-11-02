@@ -1,4 +1,4 @@
-// @polsia:user-owned — coordinator-owned co-op workspaces.
+// Coordinator-owned co-op workspaces.
 import 'server-only';
 import { headers } from 'next/headers';
 import { NextResponse } from 'next/server';

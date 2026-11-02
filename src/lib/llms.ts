@@ -1,5 +1,3 @@
-// @polsia:framework-owned — DO NOT EDIT. Code installed by polsia/template-next@0.3.0.
-//
 // The /llms.txt domain (llmstxt.org proposal): the config SHAPE (LlmsConfig) AND
 // the renderer that builds the plain-text document from it, using the same public
 // page sources + filters as the sitemap (src/lib/nav.ts + src/lib/seo-routes.ts).

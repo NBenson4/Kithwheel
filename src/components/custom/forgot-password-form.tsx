@@ -1,4 +1,4 @@
-// @polsia:user-owned — request a one-time password reset email.
+// Request a one-time password reset email.
 'use client';
 
 import Link from 'next/link';

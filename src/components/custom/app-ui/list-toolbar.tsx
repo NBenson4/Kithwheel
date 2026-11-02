@@ -1,4 +1,3 @@
-// @polsia:user-owned
 import type { ReactNode } from 'react';
 
 /** Compose labelled Input/Select/Tabs controls. State and API calls belong to the page. */

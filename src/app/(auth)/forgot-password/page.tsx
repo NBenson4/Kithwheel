@@ -1,4 +1,4 @@
-// @polsia:user-owned — password recovery request page.
+// Password recovery request page.
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import styles from '@/components/custom/auth-pages.module.css';

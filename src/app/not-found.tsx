@@ -1,4 +1,4 @@
-// @polsia:user-owned — app 404 page.
+// App 404 page.
 
 import Link from 'next/link';
 

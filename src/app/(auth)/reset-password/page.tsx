@@ -1,4 +1,4 @@
-// @polsia:user-owned — one-time password reset page.
+// One-time password reset page.
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import styles from '@/components/custom/auth-pages.module.css';

@@ -1,4 +1,4 @@
-// @polsia:user-owned — compact coordinator navigation for Workspace and Account.
+// Compact coordinator navigation for Workspace and Account.
 'use client';
 
 import { Menu } from 'lucide-react';

@@ -1,4 +1,4 @@
-// @polsia:user-owned — edit class records only inside their coordinator's co-op.
+// Edit class records only inside their coordinator's co-op.
 import 'server-only';
 import { NextResponse } from 'next/server';
 import { requireCoopCoordinator } from '@/lib/business/coordinator-auth';

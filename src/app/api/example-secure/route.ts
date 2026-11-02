@@ -1,12 +1,10 @@
-// @polsia:user-owned
-//
 // SECURE owner-scoped API route. COPY THIS SHAPE for any per-user resource:
 // `requireAuth()` + every query scoped by the caller's id.
 // Never query user data without `where: { userId: user.id }` (IDOR).
 //
 // As shipped it reads/updates the caller's own `user` row (so it compiles on
 // install). For your own model use a scalar `userId String` (NOT a Prisma
-// @relation to User — see AGENT.md), then use the owner-scoped queries below.
+// @relation to User), then use the owner-scoped queries below.
 
 import 'server-only';
 import { NextResponse } from 'next/server';

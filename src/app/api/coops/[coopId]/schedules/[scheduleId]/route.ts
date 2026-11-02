@@ -1,4 +1,4 @@
-// @polsia:user-owned — update a schedule's title and ordered rotations.
+// Update a schedule's title and ordered rotations.
 import 'server-only';
 import { NextResponse } from 'next/server';
 import { requireCoopCoordinator } from '@/lib/business/coordinator-auth';

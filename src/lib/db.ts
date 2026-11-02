@@ -1,5 +1,4 @@
-// @polsia:framework-owned — DO NOT EDIT.
-// Code installed by polsia/template-next. Server-only PrismaClient singleton.
+// Server-only PrismaClient singleton.
 import 'server-only';
 import { PrismaClient } from '@prisma/client';
 
@@ -7,9 +6,9 @@ import { PrismaClient } from '@prisma/client';
  * Seconds a pool connection may stay idle before Prisma discards it instead of
  * reusing it (Prisma's `max_idle_connection_lifetime` URL parameter).
  *
- * WHY: a Polsia app scales to zero. Its sandbox is frozen after 10–20 s without
- * a request and resumed by the next one (measured 2026-10-26 on a live app). A
- * connection kept across a long freeze can be dead on resume: a query sent on it
+ * WHY: hosts that scale to zero or freeze idle instances (serverless and
+ * sleep-on-idle plans) resume the process on the next request. A connection
+ * kept across a long freeze can be dead on resume: a query sent on it
  * gets no answer, and the other queries wait for a free connection until `P2024`
  * (pool timeout, 10 s). The app then fails every request for minutes. A limit
  * below the freeze delay makes a resumed app open fresh connections, while a

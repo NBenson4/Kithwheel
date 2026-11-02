@@ -1,4 +1,3 @@
-// @polsia:user-owned
 import type { ReactNode } from 'react';
 
 /** Place inside the caller's form; field labels, errors and submit behavior stay explicit. */

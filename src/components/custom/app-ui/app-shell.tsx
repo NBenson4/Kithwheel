@@ -1,4 +1,4 @@
-// @polsia:user-owned — opt-in application compositions; no auth or data ownership.
+// Opt-in application compositions; no auth or data ownership.
 import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 

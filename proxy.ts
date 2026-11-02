@@ -1,8 +1,5 @@
-// @polsia:shared — edit only through declared slots. Code installed by polsia/template-next@0.3.0.
-//
-// D18: Next.js 16 renamed `middleware.ts` → `proxy.ts`. Do NOT create a
-// `middleware.ts`. The Polsia validator rejects the old name (it is not a
-// local biome rule — `npm run lint` only scans src/tests).
+// Next.js 16 renamed `middleware.ts` → `proxy.ts`. Do NOT also create a
+// `middleware.ts`.
 //
 // This file is the load-bearing wire-up for:
 //   - CSP with per-request nonce
@@ -25,12 +22,10 @@ export function proxy(request: NextRequest) {
   const nonce = Buffer.from(crypto.randomUUID()).toString('base64');
   const isDev = process.env.NODE_ENV === 'development';
 
-  // @polsia:slot middleware_chain start
   // Modules contribute middleware entries (e.g., rate-limit, webhook
   // signature pre-checks) here via their manifest `contributions` block.
   // The installer maintains ordering per the module's `ordering` field.
   // Do NOT hand-edit this slot — the install-hash check will reject it.
-  // @polsia:slot middleware_chain end
 
   // CSP — script-src strict (nonce + 'strict-dynamic'); style-src relaxed for
   // headless UI. Built in src/lib/csp.ts (single source, unit-tested). The

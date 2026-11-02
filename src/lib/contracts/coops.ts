@@ -1,4 +1,4 @@
-// @polsia:user-owned — shared zod contracts for co-op scheduling data.
+// Shared zod contracts for co-op scheduling data.
 import { z } from 'zod';
 
 export const CoopRecord = z.object({

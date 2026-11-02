@@ -1,4 +1,4 @@
-// @polsia:user-owned — scoped class library for the selected co-op.
+// Scoped class library for the selected co-op.
 import 'server-only';
 import { NextResponse } from 'next/server';
 import { requireCoopCoordinator } from '@/lib/business/coordinator-auth';

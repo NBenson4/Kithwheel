@@ -1,4 +1,4 @@
-// @polsia:framework-owned — DO NOT EDIT. Builds the Content-Security-Policy
+// Builds the Content-Security-Policy
 // applied per-request in proxy.ts.
 //
 // SECURITY POSTURE (platform decision — not the agent's to change):
@@ -22,14 +22,14 @@
 // frame-src, connect-src, media-src, font-src, img-src. It never touches
 // script-src or style-src (the strict script-src is the XSS rampart), and it
 // drops wildcard / execution-escape tokens (see FORBIDDEN_SOURCE) so a per-app
-// list can never silently gut the policy. connect-src always carries the
-// platform upload host (R2_UPLOAD_HOST) on top of self and the API URL.
+// list can never silently gut the policy. connect-src always carries self and
+// the API URL.
 
 /** Extra CSP source allow-lists an app can add via next.user-config.ts. */
 export type CspExtraSources = {
   /** third-party <iframe> hosts (Stripe, YouTube, reCAPTCHA, maps, Calendly). */
   frameSrc?: string[];
-  /** fetch/XHR/WebSocket/SSE origins beyond self, NEXT_PUBLIC_API_URL and the R2 upload host. */
+  /** fetch/XHR/WebSocket/SSE origins beyond self and NEXT_PUBLIC_API_URL. */
   connectSrc?: string[];
   /** <audio>/<video> hosts beyond the base `https:` allowance (rare). */
   mediaSrc?: string[];
@@ -50,13 +50,6 @@ const FORBIDDEN_SOURCE = new Set([
   "'unsafe-hashes'",
   "'strict-dynamic'",
 ]);
-
-// Where the file-upload module PUTs end-user files: Polsia's Cloudflare R2 S3
-// endpoint (signed URLs only work on that host, never on a custom domain).
-// Constant across every app and environment, so it lives here rather than in a
-// per-app env var. A signed URL is the only write credential; allowing the host
-// in connect-src grants nothing by itself.
-export const R2_UPLOAD_HOST = 'https://*.r2.cloudflarestorage.com';
 
 // Merge a directive's base tokens with any per-app extras: split on whitespace,
 // drop forbidden and duplicate tokens, preserve order (base first, 'self' leads).
@@ -84,7 +77,7 @@ export function buildCsp(
     style-src 'self' 'unsafe-inline';
     img-src ${sourceList("'self' blob: data: https:", extra.imgSrc)};
     font-src ${sourceList("'self' data:", extra.fontSrc)};
-    connect-src ${sourceList(`'self' ${apiUrl} ${R2_UPLOAD_HOST}`, extra.connectSrc)};
+    connect-src ${sourceList(`'self' ${apiUrl}`, extra.connectSrc)};
     media-src ${sourceList("'self' blob: https:", extra.mediaSrc)};
     frame-src ${sourceList("'self'", extra.frameSrc)};
     object-src 'none';

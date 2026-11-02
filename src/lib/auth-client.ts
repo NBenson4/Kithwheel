@@ -1,18 +1,13 @@
-// @polsia:framework-owned - DO NOT EDIT. Code installed by polsia/modules/better-auth@0.11.0. Drift = commit rejected.
-//
 // better-auth React client (v1.6.x). Client-safe: NO server secrets, NO
 // server-only imports — safe to import from 'use client' components.
 //
 // SAME-ORIGIN: no baseURL is set, so the client calls /api/auth on whatever host
-// the app is served from (<slug>.polsia.app, the .io backup, or a custom brand
-// domain). This is what makes auth work on EVERY host from ONE build — an
-// absolute baseURL baked at build time made every non-primary host a cross-origin
-// call that failed CORS. The auth endpoints are mounted at /api/auth/* by the
+// the app is served from, so one build works on every host it is deployed to. The auth endpoints are mounted at /api/auth/* by the
 // catch-all route handler on that same origin.
 // Includes adminClient so the user's role is inferred and admin permission
 // helpers are available to client UI. Server-side enforcement still belongs in
 // route handlers and server helpers. genericOAuthClient adds signIn.oauth2, used by
-// the Polsia Google sign-in button.
+// the Google sign-in button.
 
 import { adminClient, genericOAuthClient } from 'better-auth/client/plugins';
 import { createAuthClient } from 'better-auth/react';

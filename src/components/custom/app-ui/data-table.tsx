@@ -1,4 +1,3 @@
-// @polsia:user-owned
 import type { Key, ReactNode } from 'react';
 import {
   Table,

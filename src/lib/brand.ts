@@ -1,7 +1,10 @@
-// @polsia:user-owned — brand identity. Edit freely. `site.ts` re-exports
+// Brand identity. Edit freely. `site.ts` re-exports
 // siteName/siteDescription; `manifest.ts` + `opengraph-image.tsx` read `brandVisual`.
 
 export const siteName = 'Kithwheel';
+
+/** Public contact address shown on the landing page. Update once the domain's mailbox exists. */
+export const contactEmail = 'hello@kithwheel.com';
 export const siteDescription =
   'The co-op management app that keeps every moving part in sync. Schedules, sign-ups, class announcements, payments and volunteer hours for homeschool co-ops.';
 

@@ -1,4 +1,4 @@
-// @polsia:user-owned — server-rendered shell for Kithwheel's coordinator workspace.
+// Server-rendered shell for Kithwheel's coordinator workspace.
 import type { Metadata } from 'next';
 import { CoordinatorWorkspace } from '@/components/custom/scheduling/coordinator-workspace';
 

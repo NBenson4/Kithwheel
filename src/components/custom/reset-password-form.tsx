@@ -1,4 +1,4 @@
-// @polsia:user-owned — set a new password with the one-time Better Auth token.
+// Set a new password with the one-time Better Auth token.
 'use client';
 
 import Link from 'next/link';

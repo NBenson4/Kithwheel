@@ -1,9 +1,11 @@
-// @polsia:user-owned — Kithwheel's public home.
+// Kithwheel's public home.
 
 import { ArrowRight, Check, ChevronRight, Clock3, Mail } from 'lucide-react';
 import type { Metadata } from 'next';
 import { AuthNav } from '@/components/custom/auth-nav';
-import { siteDescription, siteName } from '@/lib/brand';
+import { contactEmail, siteDescription, siteName } from '@/lib/brand';
+
+const contactHref = `mailto:${contactEmail}?subject=Hello%20Kithwheel`;
 
 export const metadata: Metadata = {
   title: { absolute: siteName },
@@ -68,7 +70,7 @@ export default function HomePage() {
           <a href="#together">How it fits</a>
         </nav>
         <div className="kw-header-actions">
-          <a className="kw-header-cta" href="mailto:kithwheel@polsia.app?subject=Hello%20Kithwheel">
+          <a className="kw-header-cta" href={contactHref}>
             Get in touch <ArrowRight aria-hidden="true" size={15} />
           </a>
           <AuthNav />
@@ -94,10 +96,7 @@ export default function HomePage() {
               shared place.
             </p>
             <div className="kw-hero-actions">
-              <a
-                className="kw-button kw-button-dark"
-                href="mailto:kithwheel@polsia.app?subject=Hello%20Kithwheel"
-              >
+              <a className="kw-button kw-button-dark" href={contactHref}>
                 <Mail aria-hidden="true" size={16} />
                 Contact Kithwheel
               </a>
@@ -315,10 +314,7 @@ export default function HomePage() {
               details, class notes, payments and volunteer tracking into one place built around how
               a co-op works.
             </p>
-            <a
-              className="kw-button kw-button-paper"
-              href="mailto:kithwheel@polsia.app?subject=Hello%20Kithwheel"
-            >
+            <a className="kw-button kw-button-paper" href={contactHref}>
               Say hello <ArrowRight aria-hidden="true" size={15} />
             </a>
           </div>
@@ -363,12 +359,9 @@ export default function HomePage() {
           </div>
           <div className="kw-contact-action">
             <p>Every co-op has its own rhythm. We’d love to hear what yours needs.</p>
-            <a
-              className="kw-button kw-button-dark"
-              href="mailto:kithwheel@polsia.app?subject=Hello%20Kithwheel"
-            >
+            <a className="kw-button kw-button-dark" href={contactHref}>
               <Mail aria-hidden="true" size={16} />
-              kithwheel@polsia.app
+              {contactEmail}
             </a>
           </div>
         </section>
@@ -388,8 +381,8 @@ export default function HomePage() {
         <span className="kw-footer-tagline">
           The co-op management app that keeps every moving part in sync.
         </span>
-        <a className="kw-footer-email" href="mailto:kithwheel@polsia.app">
-          kithwheel@polsia.app
+        <a className="kw-footer-email" href={`mailto:${contactEmail}`}>
+          {contactEmail}
         </a>
         <span className="kw-copyright">© {new Date().getFullYear()} Kithwheel</span>
       </footer>

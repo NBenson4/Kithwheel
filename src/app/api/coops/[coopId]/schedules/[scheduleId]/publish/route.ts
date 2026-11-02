@@ -1,4 +1,4 @@
-// @polsia:user-owned — publish one complete schedule as the co-op's current plan.
+// Publish one complete schedule as the co-op's current plan.
 import 'server-only';
 import { NextResponse } from 'next/server';
 import { requireCoopCoordinator } from '@/lib/business/coordinator-auth';

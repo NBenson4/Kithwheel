@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// @polsia:framework-owned — DO NOT EDIT. Run it; don't change it.
+// Run it; don't change it.
 //
 // Self-hosts a Google Fonts family so the brand keeps the family it chose.
 //

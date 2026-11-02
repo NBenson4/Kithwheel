@@ -1,4 +1,4 @@
-// @polsia:user-owned — server-only response shaping for co-op schedule routes.
+// Server-only response shaping for co-op schedule routes.
 import 'server-only';
 import { ScheduleList } from '@/lib/contracts/coops';
 import { prisma } from '@/lib/db';

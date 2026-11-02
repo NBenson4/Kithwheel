@@ -1,4 +1,4 @@
-/* @polsia:shared — framework wiring plus a neutral FALLBACK theme. The only
+/* Framework wiring plus a neutral FALLBACK theme. The only
  * part of this file the agent edits is the seed inside the `brand_tokens`
  * slot; the @theme namespaces, the derived fallback block, @layer base/
  * components and @custom-variant dark are framework structure.
@@ -128,7 +128,6 @@
 }
 
 @layer base {
-  /* === BEGIN polsia-slot:brand_tokens === */
   /* THE SEED — the fallback the derived block below is computed from. It is
      achromatic on purpose: a fresh app is unbranded until the agent defines the
      brand, either by raising --brand-c here (and choosing --brand-h) or, for
@@ -148,7 +147,6 @@
     --font-display: ui-sans-serif, system-ui, sans-serif;
     --font-body: ui-sans-serif, system-ui, sans-serif;
   }
-  /* === END polsia-slot:brand_tokens === */
 
   /* FRAMEWORK FALLBACK derived from the seed. Not agent-editable here (outside
      the slot), but every ramp step and role can be overridden by an unlayered

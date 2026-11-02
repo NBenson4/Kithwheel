@@ -1,4 +1,4 @@
-// @polsia:user-owned — coordinator account creation.
+// Coordinator account creation.
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import styles from '@/components/custom/auth-pages.module.css';

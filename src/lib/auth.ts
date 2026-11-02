@@ -1,7 +1,6 @@
-// @polsia:framework-owned - DO NOT EDIT. Code installed by polsia/modules/better-auth@0.11.0. Drift = commit rejected.
-// Protected core (db/secret/base URL, admin plugin, multi-host trusted origins, Google sign-in
-// through Polsia or the owner's client, with its multi-host base URL) + owner-admin grant, composed with the app's own databaseHooks. Configure auth
-// in @/lib/auth-config (user-owned).
+// Server auth (Better Auth): database, secret, base URL, admin plugin, trusted origins,
+// optional Google sign-in, and the owner-admin grant, composed with the app's own
+// databaseHooks. App-level auth options live in @/lib/auth-config.
 
 import 'server-only';
 import { type BetterAuthOptions, betterAuth } from 'better-auth';
@@ -14,27 +13,22 @@ import { env } from '@/lib/env';
 
 // Compose the owner-admin grant with the app's hooks — don't overwrite them.
 const appHooks = authConfig.databaseHooks;
-const ownerEmail = env.POLSIA_OWNER_EMAIL?.trim().toLowerCase();
+const ownerEmail = env.OWNER_EMAIL?.trim().toLowerCase();
 
-// Multi-host auth: ONE build is served on <slug>.polsia.app, the <slug>.polsia.io
-// backup domain, and custom brand domains — each must pass better-auth's
-// Origin/CSRF check on sign-in/sign-up. The wildcards cover the Polsia serving
-// domains (incl. any post-rename slug); BETTER_AUTH_TRUSTED_ORIGINS is injected
-// per-deploy by the Polsia backend with the company's active custom domains.
-// baseURL's own origin is always trusted implicitly. Framework-owned so an
-// app can't accidentally narrow it back to a single host.
+// Origins allowed to call sign-in/sign-up (Better Auth's Origin/CSRF check).
+// BETTER_AUTH_URL's own origin is always trusted; BETTER_AUTH_TRUSTED_ORIGINS adds
+// any other exact hosts the app is served on (for example a www. variant).
 const customOrigins =
   env.BETTER_AUTH_TRUSTED_ORIGINS?.split(',')
     .map((o) => o.trim())
     .filter(Boolean) ?? [];
-const trustedOrigins = ['https://*.polsia.app', 'https://*.polsia.io', ...customOrigins];
+const trustedOrigins = [...customOrigins];
 
 const WILDCARD = '*';
 const HTTP_PROTOCOL = 'http:';
 
-/** Provider id of Google sign-in (Polsia broker or the owner's client); the button signs in with it. */
+/** Provider id of Google sign-in; the sign-in button uses it. */
 const GOOGLE_PROVIDER_ID = 'google';
-const GOOGLE_BROKER_PATH = '/api/v2/app-auth/google';
 const GOOGLE_SCOPES = ['openid', 'email', 'profile'];
 const GOOGLE_AUTHORIZATION_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
 const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
@@ -97,7 +91,7 @@ function googleProvider(
 }
 
 /**
- * The owner's own Google OAuth client, set as app secrets (`NEXT_PUBLIC_GOOGLE_SIGNIN_CLIENT_ID`,
+ * Your Google OAuth client, set as secrets (`NEXT_PUBLIC_GOOGLE_SIGNIN_CLIENT_ID`,
  * `GOOGLE_SIGNIN_CLIENT_SECRET`): Google directly, identity from the `id_token` its token
  * endpoint returns. `undefined` unless both are set.
  */
@@ -115,28 +109,9 @@ function ownGoogle(): GenericOAuthConfig | undefined {
   });
 }
 
-/** The Polsia Google sign-in broker (a standard OAuth provider); `undefined` unless Polsia injects its env. */
-function polsiaGoogle(): GenericOAuthConfig | undefined {
-  const clientId = env.POLSIA_GOOGLE_SIGNIN_CLIENT_ID;
-  const apiBaseURL = env.POLSIA_API_BASE_URL;
-  const apiKey = env.POLSIA_API_KEY;
-  if (!clientId || !apiBaseURL || !apiKey) {
-    return undefined;
-  }
-
-  const brokerURL = (action: string) =>
-    new URL(`${GOOGLE_BROKER_PATH}/${action}`, apiBaseURL).toString();
-
-  return googleProvider(clientId, apiKey, {
-    authorizationUrl: brokerURL('authorize'),
-    tokenUrl: brokerURL('token'),
-    userInfoUrl: brokerURL('userinfo'),
-  });
-}
-
 /**
- * Google sign-in as one generic provider `google`: the owner's own client when set, otherwise
- * the Polsia broker. None when the app configures `socialProviders.google`: the generic
+ * Google sign-in as one generic provider `google`, enabled when both Google client
+ * variables are set. None when the app configures `socialProviders.google`: the generic
  * provider would shadow it.
  */
 function googleSignIn() {
@@ -144,7 +119,7 @@ function googleSignIn() {
     return [];
   }
 
-  const config = ownGoogle() ?? polsiaGoogle();
+  const config = ownGoogle();
   if (!config) {
     return [];
   }

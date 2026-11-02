@@ -1,3 +1,9 @@
+# Third-party notices
+
+Parts of this codebase began as the Polsia Next.js app template (`polsia-next-v2`),
+which is distributed under the MIT License reproduced below.
+
+```text
 MIT License
 
 Copyright (c) 2026 Polsia, Inc.
@@ -19,3 +25,4 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+```

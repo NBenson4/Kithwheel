@@ -1,4 +1,3 @@
-// @polsia:user-owned
 'use client';
 
 import { LayoutDashboard } from 'lucide-react';

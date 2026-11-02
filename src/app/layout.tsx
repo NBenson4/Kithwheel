@@ -1,13 +1,10 @@
-// @polsia:framework-owned — the framework owns this shell (re-stamped on upgrade; the
-// ownership gate rejects edits). Customize via the user-owned seams it imports — see
-// AGENTS.md "Customizing the shell" (lang/head/viewport/providers/nav/brand/root classes).
-// Code installed by polsia/template-next@0.3.6.
+// Root layout. Customize through the files it imports: locale (lang/dir), head-content,
+// viewport-config, providers, site-nav, brand, and root-attributes.
 import type { Metadata, Viewport } from 'next';
 import { headers } from 'next/headers';
 import { GlobalMounts } from '@/components/custom/global-mounts';
 import { HeadContent } from '@/components/custom/head-content';
 import { SiteFooter, SiteNav } from '@/components/custom/site-nav';
-import { PolsiaAnalytics } from '@/components/polsia-analytics';
 import { AppProviders } from '@/components/providers';
 import { ThemeProvider } from '@/components/theme-provider';
 import { Toaster } from '@/components/ui/sonner';
@@ -22,7 +19,7 @@ import './globals.css';
 // (canonical, OG image) absolute. `title.template` lets a page export
 // `title: 'Pricing'` and get `Pricing · <site>` for free, while pages with no
 // title fall back to `title.default`. Per-page title/description/OG-image and
-// structured data come from the page's own `metadata` export (POL-2616) — these
+// structured data come from the page's own `metadata` export — these
 // are only the site-wide defaults.
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
@@ -55,18 +52,7 @@ export const viewport: Viewport = { ...viewportConfig };
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   // Next.js 16: headers() is async. Reading it opts the route into dynamic
   // rendering (per-request) — required for the per-request CSP nonce.
-  // POLSIA_STATIC_CHECK is a BUILD-ONLY escape hatch for Polsia's in-sandbox
-  // render gate: when set, skip the nonce read so routes stay statically
-  // prerenderable and `next build` render-checks every route (catching SSR
-  // throws a normal dynamic build never surfaces). It is NEVER set on the real
-  // deploy build, so production keeps the per-request nonce + dynamic rendering
-  // unchanged (SEO/CSP identical).
-  const nonce = process.env.POLSIA_STATIC_CHECK
-    ? undefined
-    : ((await headers()).get('x-nonce') ?? undefined);
-  // Visitor beacon: deploy-injected app slug + per-env platform base.
-  const analyticsSlug = process.env.POLSIA_ANALYTICS_SLUG;
-  const analyticsBase = process.env.POLSIA_API_BASE_URL;
+  const nonce = (await headers()).get('x-nonce') ?? undefined;
 
   return (
     // Root class names (next/font variables, density hooks) — edit src/lib/root-attributes.ts.
@@ -101,7 +87,6 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             {/* Root/global mounts (Cmd+K palette, global listeners, overlays) — edit global-mounts.tsx, not this file. */}
             <GlobalMounts />
           </AppProviders>
-          {analyticsSlug ? <PolsiaAnalytics slug={analyticsSlug} base={analyticsBase} /> : null}
         </ThemeProvider>
       </body>
     </html>

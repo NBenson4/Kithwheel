@@ -1,4 +1,4 @@
-// @polsia:user-owned — member workspace navigation.
+// Member workspace navigation.
 'use client';
 
 import { CalendarDays } from 'lucide-react';

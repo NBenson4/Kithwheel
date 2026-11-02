@@ -1,8 +1,8 @@
 {
-  "name": "polsia-app-template",
-  "version": "0.3.16",
+  "name": "kithwheel",
+  "version": "0.1.0",
   "private": true,
-  "description": "Polsia Next.js template with the shadcn UI baseline built in",
+  "description": "Kithwheel: co-op management for homeschool co-ops",
   "engines": {
     "node": ">=20.18.1"
   },
@@ -16,12 +16,13 @@
     "font:add": "node scripts/add-font.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:postgres": "node --test tests/integration/prisma-deployment.test.mjs tests/integration/prisma-idle-pool.test.mjs",
+    "test:postgres": "node --test tests/integration/prisma-idle-pool.test.mjs",
     "db:generate": "prisma generate",
     "db:migrate:dev": "prisma migrate dev",
     "db:migrate:deploy": "prisma migrate deploy",
     "db:studio": "prisma studio",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@hookform/resolvers": "5.4.0",

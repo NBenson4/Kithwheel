@@ -1,4 +1,4 @@
-// @polsia:user-owned — account details and the coordinator sign-out action.
+// Account details and the coordinator sign-out action.
 'use client';
 
 import { LogOut } from 'lucide-react';

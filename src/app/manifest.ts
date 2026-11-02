@@ -1,5 +1,3 @@
-// @polsia:framework-owned — DO NOT EDIT. Code installed by polsia/template-next@0.3.0.
-//
 // /manifest.webmanifest — colors come from `brandVisual` in src/lib/brand.ts; set them there.
 import type { MetadataRoute } from 'next';
 import { brandVisual } from '@/lib/brand';

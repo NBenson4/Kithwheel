@@ -1,4 +1,4 @@
-// @polsia:user-owned — focused sign-in entry for co-op coordinators.
+// Focused sign-in entry for co-op coordinators.
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import styles from '@/components/custom/auth-pages.module.css';

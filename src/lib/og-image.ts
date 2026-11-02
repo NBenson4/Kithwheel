@@ -1,5 +1,3 @@
-// @polsia:framework-owned — DO NOT EDIT. Code installed by polsia/template-next@0.3.0.
-//
 // Helpers for src/app/opengraph-image.tsx. The optional background photo is
 // `brandVisual.og.image` in src/lib/brand.ts.
 

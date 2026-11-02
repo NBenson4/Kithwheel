@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildCsp, R2_UPLOAD_HOST } from '@/lib/csp';
+import { buildCsp } from '@/lib/csp';
 
 // Locks the platform CSP posture so a future edit can't silently re-tighten
 // style-src (breaks Radix/shadcn in prod) or loosen script-src (XSS regression).
@@ -40,7 +40,7 @@ describe('buildCsp', () => {
 
   it('appends a configured API origin to connect-src', () => {
     expect(buildCsp('n', false, 'https://api.example.com')).toContain(
-      `connect-src 'self' https://api.example.com ${R2_UPLOAD_HOST}`,
+      `connect-src 'self' https://api.example.com`,
     );
   });
 });
@@ -54,11 +54,11 @@ describe('buildCsp — extra sources seam', () => {
       .find((d) => d.trim().startsWith(`${name} `))
       ?.trim() ?? '';
 
-  it('keeps frames same-origin and fetches to self plus the R2 upload host when no extras are given', () => {
+  it('keeps frames same-origin and fetches to self only when no extras are given', () => {
     const csp = buildCsp('n', false);
     expect(directive(csp, 'frame-src')).toBe("frame-src 'self'");
     expect(directive(csp, 'media-src')).toBe("media-src 'self' blob: https:");
-    expect(directive(csp, 'connect-src')).toBe(`connect-src 'self' ${R2_UPLOAD_HOST}`);
+    expect(directive(csp, 'connect-src')).toBe(`connect-src 'self'`);
   });
 
   it('appends extras to their own resource directives', () => {
@@ -69,9 +69,7 @@ describe('buildCsp — extra sources seam', () => {
       fontSrc: ['https://fonts.gstatic.com'],
     });
     expect(directive(csp, 'frame-src')).toBe("frame-src 'self' https://js.stripe.com");
-    expect(directive(csp, 'connect-src')).toBe(
-      `connect-src 'self' ${R2_UPLOAD_HOST} https://api.supabase.co`,
-    );
+    expect(directive(csp, 'connect-src')).toBe(`connect-src 'self' https://api.supabase.co`);
     expect(directive(csp, 'media-src')).toBe(
       "media-src 'self' blob: https: https://cdn.example.com",
     );
@@ -83,7 +81,7 @@ describe('buildCsp — extra sources seam', () => {
       connectSrc: ['wss://realtime.example.com'],
     });
     expect(directive(csp, 'connect-src')).toBe(
-      `connect-src 'self' https://api.example.com ${R2_UPLOAD_HOST} wss://realtime.example.com`,
+      `connect-src 'self' https://api.example.com wss://realtime.example.com`,
     );
   });
 
@@ -93,18 +91,14 @@ describe('buildCsp — extra sources seam', () => {
       connectSrc: ["'unsafe-inline'", "'strict-dynamic'", 'https://fine.example.com'],
     });
     expect(directive(csp, 'frame-src')).toBe("frame-src 'self' https://ok.example.com");
-    expect(directive(csp, 'connect-src')).toBe(
-      `connect-src 'self' ${R2_UPLOAD_HOST} https://fine.example.com`,
-    );
+    expect(directive(csp, 'connect-src')).toBe(`connect-src 'self' https://fine.example.com`);
   });
 
   it('deduplicates repeated source tokens', () => {
     const csp = buildCsp('n', false, 'https://api.example.com', {
       connectSrc: ['https://api.example.com', "'self'"],
     });
-    expect(directive(csp, 'connect-src')).toBe(
-      `connect-src 'self' https://api.example.com ${R2_UPLOAD_HOST}`,
-    );
+    expect(directive(csp, 'connect-src')).toBe(`connect-src 'self' https://api.example.com`);
   });
 
   it('never lets extras reach script-src or style-src (XSS rampart intact)', () => {

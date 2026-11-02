@@ -1,4 +1,4 @@
-// @polsia:user-owned — the signed-in coordinator's Account page.
+// The signed-in coordinator's Account page.
 import type { Metadata } from 'next';
 import { AccountView } from '@/components/custom/account-view';
 import { ProductShell } from '@/components/custom/dashboard/dashboard-shell';

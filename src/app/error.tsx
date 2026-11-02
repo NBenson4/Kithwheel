@@ -1,4 +1,4 @@
-// @polsia:user-owned — route error boundary (Client Component). Restyle or delete.
+// Route error boundary (Client Component). Restyle or delete.
 
 'use client';
 

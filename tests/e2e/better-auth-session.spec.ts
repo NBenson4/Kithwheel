@@ -1,4 +1,3 @@
-// @polsia:framework-owned - DO NOT EDIT. Code installed by polsia/modules/better-auth@0.10.0. Drift = commit rejected.
 // Signing up must open a session: a paywall or a protected page right after signup depends on it.
 // When this test fails, fix src/lib/auth-config.ts, never this test.
 

@@ -1,4 +1,4 @@
-# Polsia Next.js template — gitignore (Node + Next.js + tools)
+# Kithwheel — gitignore (Node + Next.js + tools)
 
 # Dependencies
 node_modules/
@@ -42,8 +42,9 @@ lerna-debug.log*
 # Vercel
 .vercel
 
-# Polsia upgrade reconcile sidecars (never commit)
-*.polsia-app-old
-
 # Local Superpowers planning artifacts: never commit
 /docs/superpowers/
+
+# Playwright
+/test-results/
+/playwright-report/

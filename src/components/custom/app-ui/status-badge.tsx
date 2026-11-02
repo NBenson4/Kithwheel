@@ -1,4 +1,3 @@
-// @polsia:user-owned
 import type { ReactNode } from 'react';
 import { Badge } from '@/components/ui/badge';
 

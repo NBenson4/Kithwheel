@@ -1,4 +1,4 @@
-// @polsia:user-owned — signed-in shell for Kithwheel coordinator surfaces.
+// Signed-in shell for Kithwheel coordinator surfaces.
 'use client';
 
 import { useRouter } from 'next/navigation';

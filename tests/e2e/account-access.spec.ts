@@ -1,8 +1,8 @@
-// @polsia:user-owned — coordinator account, recovery, and workspace access journey.
+// Coordinator account, recovery, and workspace access journey.
 import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
+import { type APIRequestContext, expect, test } from '@playwright/test';
 import { PrismaClient } from '@prisma/client';
-import { expect, test, type APIRequestContext } from '@playwright/test';
 import { CoopClassList, CoopClassRecord, CoopList, ScheduleList } from '@/lib/contracts/coops';
 
 const prisma = new PrismaClient();
@@ -26,7 +26,9 @@ function latestResetLink(recipient: string) {
       continue;
     }
     if (captured?.to !== recipient || captured.subject !== passwordResetSubject) continue;
-    const content = [captured.body, captured.html].filter((item) => typeof item === 'string').join('\n');
+    const content = [captured.body, captured.html]
+      .filter((item) => typeof item === 'string')
+      .join('\n');
     const match = content.match(/https?:\/\/[^\s<>"']+/);
     if (match?.[0]) return match[0].replaceAll('&amp;', '&');
   }
@@ -83,7 +85,9 @@ test('a coordinator signs up, creates a private workspace, uses Account, signs o
   await expect(page.getByRole('link', { name: 'Sign up' })).toBeVisible();
   await page.getByRole('link', { name: 'Sign up' }).click();
   await expect(page.getByRole('heading', { name: 'Create your account' })).toBeVisible();
-  await expect(page.getByText(/separate from any fees families may pay their co-op/i)).toBeVisible();
+  await expect(
+    page.getByText(/separate from any fees families may pay their co-op/i),
+  ).toBeVisible();
 
   await page.getByLabel('Name').fill('Cedar Grove Coordinator');
   await page.getByLabel('Email address').fill(email);
@@ -158,7 +162,10 @@ test('a coordinator signs up, creates a private workspace, uses Account, signs o
   await page.getByRole('button', { name: 'Sign in' }).click();
   await expect(page).toHaveURL(/\/dashboard$/);
   await expect(page.getByRole('option', { name: 'Cedar Grove Co-op' })).toBeAttached();
-  await page.getByRole('navigation', { name: 'Product navigation' }).getByRole('link', { name: 'Account' }).click();
+  await page
+    .getByRole('navigation', { name: 'Product navigation' })
+    .getByRole('link', { name: 'Account' })
+    .click();
   await expect(page.getByRole('heading', { name: 'Account' })).toBeVisible();
 });
 
@@ -386,7 +393,10 @@ test('Workspace explains denied record reads and recovers when ownership is rest
   }
 });
 
-test('invalid email and password stay signed out with accessible feedback', async ({ page, baseURL }) => {
+test('invalid email and password stay signed out with accessible feedback', async ({
+  page,
+  baseURL,
+}) => {
   const origin = new URL(baseURL ?? process.env.BASE_URL ?? 'http://localhost:3000').origin;
   await page.goto('/login');
   await page.getByLabel('Email address').fill(`missing-${randomUUID()}@example.test`);

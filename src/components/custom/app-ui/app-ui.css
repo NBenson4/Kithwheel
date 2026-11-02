@@ -1,4 +1,4 @@
-/* @polsia:user-owned — optional building blocks for data screens (see docs/app-ui.md).
+/* Optional building blocks for data screens (see docs/app-ui.md).
  * Scoped to `.app-ui`; inherits the app's theme tokens (brand-theme.css) and light/dark.
  * Starting point, not a required composition: restyle, override with utilities, or delete
  * the folder together with its @import line in src/app/custom-style.css.

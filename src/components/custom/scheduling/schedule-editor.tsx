@@ -1,4 +1,4 @@
-// @polsia:user-owned — editable draft, review, publish, and withdraw controls.
+// Editable draft, review, publish, and withdraw controls.
 'use client';
 
 import { ArrowDown, ArrowUp, Plus, Save, Trash2 } from 'lucide-react';

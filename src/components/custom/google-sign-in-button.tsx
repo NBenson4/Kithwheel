@@ -1,7 +1,4 @@
-// @polsia:framework-owned - DO NOT EDIT. Code installed by polsia/modules/better-auth@0.11.0. Drift = commit rejected.
-//
-// "Continue with Google" through the Polsia Google sign-in broker or the owner's own Google
-// client, with an "or" divider and the error that came back from Google (`?error=<code>` on
+// "Continue with Google" through your own Google OAuth client, with an "or" divider and the error that came back from Google (`?error=<code>` on
 // this page). Renders nothing until Google sign-in is enabled. Style it through `className`.
 'use client';
 
@@ -9,12 +6,10 @@ import { useEffect, useState } from 'react';
 import { authClient } from '@/lib/auth-client';
 
 /**
- * Set by Polsia when it enables Google sign-in, or by the owner's own Google client id.
- * Read literally so Next inlines them in the bundle.
+ * Enabled when your Google client id is set (the server also needs
+ * GOOGLE_SIGNIN_CLIENT_SECRET). Read literally so Next inlines it in the bundle.
  */
-const GOOGLE_SIGNIN_ENABLED = Boolean(
-  process.env.NEXT_PUBLIC_POLSIA_GOOGLE_SIGNIN || process.env.NEXT_PUBLIC_GOOGLE_SIGNIN_CLIENT_ID,
-);
+const GOOGLE_SIGNIN_ENABLED = Boolean(process.env.NEXT_PUBLIC_GOOGLE_SIGNIN_CLIENT_ID);
 
 /** Provider id registered by `src/lib/auth.ts`. */
 const GOOGLE_PROVIDER_ID = 'google';

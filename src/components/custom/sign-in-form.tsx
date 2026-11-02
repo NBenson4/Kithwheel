@@ -1,9 +1,8 @@
-// @polsia:user-owned
 'use client';
 
 import Link from 'next/link';
 import { useState } from 'react';
-import { GoogleSignInButton } from '@/components/polsia/google-sign-in-button';
+import { GoogleSignInButton } from '@/components/custom/google-sign-in-button';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';

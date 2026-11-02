@@ -1,4 +1,4 @@
-// @polsia:user-owned — the four-part Kithwheel mark shared by product screens.
+// The four-part Kithwheel mark shared by product screens.
 import type { HTMLAttributes } from 'react';
 
 export function KithwheelMark({ className }: HTMLAttributes<HTMLSpanElement>) {

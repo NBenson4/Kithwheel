@@ -1,4 +1,4 @@
-// @polsia:user-owned — class names the framework-owned layout merges onto <html> and <body>.
+// Class names the framework-owned layout merges onto <html> and <body>.
 //
 // This is THE seam for `next/font`: its loaders return a CLASS, not a CSS value, and the
 // class must sit on an ancestor of everything — including Radix portals that mount on

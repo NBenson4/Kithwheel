@@ -1,4 +1,4 @@
-// @polsia:user-owned — configure better-auth here (spread into betterAuth() by @/lib/auth).
+// Configure better-auth here (spread into betterAuth() by @/lib/auth).
 // Add emailAndPassword options, plugins, session, socialProviders, databaseHooks, etc.
 // Framework owns db/secret/baseURL/admin(), verified-owner bootstrap, and disables
 // session cookie caching so verification/role changes appear on the next session read.
