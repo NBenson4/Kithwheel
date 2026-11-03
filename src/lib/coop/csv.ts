@@ -39,6 +39,7 @@ export function parseCsv(text: string): string[][] {
 }
 
 export type ImportedClass = {
+  section?: string;
   name: string;
   description?: string;
   teacher?: string;
@@ -58,6 +59,9 @@ export type ImportPreview = {
 };
 
 const COLUMN_ALIASES: Record<string, keyof ImportedClass> = {
+  section: 'section',
+  grade: 'section',
+  'age group': 'section',
   name: 'name',
   class: 'name',
   'class name': 'name',

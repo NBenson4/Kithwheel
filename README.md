@@ -5,10 +5,14 @@ sign-ups, announcements, payments, and volunteer hours in one place.
 
 ## What coordinators get
 
-- **Schedule**: class library (seats, fees, materials), age-group rotations, publish,
-  copy last term, spreadsheet import.
-- **Families**: registration from the family link, class rosters, waitlists that fill
-  automatically (with an email to the family), manual family entry, CSV export.
+- **Schedules**: nine grade sections by default (Pre-K, Kindergarten, 1st–5th, 6th–7th,
+  8th–12th; rename, reorder, add or remove). Each section has its own schedule of classes
+  (teacher, room, time, seats, fee, materials) that the coordinator approves before families
+  see it. Spreadsheet import files classes into sections.
+- **Families**: families sign up from the family link with each child's grade; coordinators put
+  children into sections (one click for everyone who chose a grade). A child takes their
+  section's whole schedule, with case-by-case exceptions: skip one of the section's classes, or
+  take a single class from another section. Time clashes are flagged.
 - **Check-in**: morning check-in and pickup, a check-in tablet link, attendance history.
 - **Announcements**: emailed to every family or one class, kept on family pages.
 - **Volunteer hours**: families log time, coordinators approve, totals against a requirement.

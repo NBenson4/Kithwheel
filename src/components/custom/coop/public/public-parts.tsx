@@ -85,16 +85,8 @@ export function ClassCard({ item, extra }: { item: PublicClass; extra?: ReactNod
           <strong>Materials:</strong> {item.materials}
         </span>
       )}
-      {(item.feeCents > 0 || item.capacity !== null) && (
-        <span className={styles.rowMeta}>
-          {item.feeCents > 0 ? `Class fee ${formatMoney(item.feeCents)}` : ''}
-          {item.feeCents > 0 && item.capacity !== null ? ' · ' : ''}
-          {item.capacity !== null
-            ? item.seatsLeft
-              ? `${item.seatsLeft} ${item.seatsLeft === 1 ? 'seat' : 'seats'} left`
-              : `Full${item.waitlisted ? ` · ${item.waitlisted} on the waitlist` : ' · waitlist open'}`
-            : ''}
-        </span>
+      {item.feeCents > 0 && (
+        <span className={styles.rowMeta}>Class fee {formatMoney(item.feeCents)}</span>
       )}
       {extra}
     </div>
@@ -102,15 +94,21 @@ export function ClassCard({ item, extra }: { item: PublicClass; extra?: ReactNod
 }
 
 export function ScheduleView({ schedule }: { schedule: PublicSchedule }) {
+  if (!schedule.sections.length) {
+    return (
+      <p className={base.description} style={{ margin: 0 }}>
+        No section schedules have been approved yet. Check back soon.
+      </p>
+    );
+  }
   return (
     <div className={styles.rotationGrid}>
-      {schedule.rotations.map((rotation, index) => (
-        // biome-ignore lint/suspicious/noArrayIndexKey: rotations are ordered and have no public id.
-        <div className={styles.rotationCard} key={index}>
+      {schedule.sections.map((section) => (
+        <div className={styles.rotationCard} key={section.name}>
           <h3 className={styles.groupTitle} style={{ margin: 0 }}>
-            {rotation.ageGroup}
+            {section.name}
           </h3>
-          {rotation.classes.map((item) => (
+          {section.classes.map((item) => (
             <ClassCard key={item.id} item={item} />
           ))}
         </div>

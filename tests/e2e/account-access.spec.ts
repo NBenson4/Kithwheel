@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { type APIRequestContext, expect, test } from '@playwright/test';
 import { PrismaClient } from '@prisma/client';
-import { CoopClassList, CoopClassRecord, CoopList, ScheduleList } from '@/lib/contracts/coops';
+import { CoopClassList, CoopClassRecord, CoopList, SectionList } from '@/lib/contracts/coops';
 
 const prisma = new PrismaClient();
 const emailCapturePath = '/tmp/kithwheel-email-capture.jsonl';
@@ -212,22 +212,30 @@ test('a second authenticated coordinator cannot read or change another coordinat
     if (!workspace) throw new Error('The owner workspace was not returned');
     expect(workspace.name).toBe(workspaceName);
 
+    const sectionsResponse = await page.request.get(`/api/coops/${workspace.id}/sections`, {
+      headers: { origin },
+    });
+    const ownerSections = SectionList.parse(await sectionsResponse.json());
+    expect(ownerSections.items.map((item) => item.name)).toEqual([
+      'Pre-K',
+      'Kindergarten',
+      '1st grade',
+      '2nd grade',
+      '3rd grade',
+      '4th grade',
+      '5th grade',
+      '6th–7th grade',
+      '8th–12th grade',
+    ]);
+    const ownerSection = ownerSections.items[3];
+    if (!ownerSection) throw new Error('The owner section fixture was not returned');
+
     const classCreation = await page.request.post(`/api/coops/${workspace.id}/classes`, {
       headers: { origin },
-      data: { name: 'Owner-only class record' },
+      data: { name: 'Owner-only class record', sectionId: ownerSection.id },
     });
     expect(classCreation.status()).toBe(201);
     const ownerClass = CoopClassRecord.parse(await classCreation.json());
-
-    const scheduleCreation = await page.request.post(`/api/coops/${workspace.id}/schedules`, {
-      headers: { origin },
-      data: { title: 'Owner-only schedule record' },
-    });
-    expect(scheduleCreation.status()).toBe(201);
-    const ownerSchedulesBefore = ScheduleList.parse(await scheduleCreation.json());
-    expect(ownerSchedulesBefore.items).toHaveLength(1);
-    const ownerSchedule = ownerSchedulesBefore.items[0];
-    if (!ownerSchedule) throw new Error('The owner schedule fixture was not returned');
 
     const ownerClassesBeforeResponse = await page.request.get(
       `/api/coops/${workspace.id}/classes`,
@@ -259,49 +267,48 @@ test('a second authenticated coordinator cannot read or change another coordinat
 
     const foreignReads = await Promise.all([
       secondContext.request.get(`/api/coops/${workspace.id}/classes`, { headers: { origin } }),
-      secondContext.request.get(`/api/coops/${workspace.id}/schedules`, { headers: { origin } }),
+      secondContext.request.get(`/api/coops/${workspace.id}/sections`, { headers: { origin } }),
     ]);
     expect(foreignReads.map((response) => response.status())).toEqual([403, 403]);
 
     const foreignMutations = await Promise.all([
       secondContext.request.post(`/api/coops/${workspace.id}/classes`, {
         headers: { origin },
-        data: { name: 'Unauthorized class' },
+        data: { name: 'Unauthorized class', sectionId: ownerSection.id },
       }),
       secondContext.request.patch(`/api/coops/${workspace.id}/classes/${ownerClass.id}`, {
         headers: { origin },
         data: { name: 'Changed by second coordinator' },
       }),
-      secondContext.request.post(`/api/coops/${workspace.id}/schedules`, {
+      secondContext.request.post(`/api/coops/${workspace.id}/sections`, {
         headers: { origin },
-        data: { title: 'Unauthorized schedule' },
+        data: { name: 'Unauthorized section' },
       }),
-      secondContext.request.patch(`/api/coops/${workspace.id}/schedules/${ownerSchedule.id}`, {
+      secondContext.request.patch(`/api/coops/${workspace.id}/sections/${ownerSection.id}`, {
         headers: { origin },
-        data: { title: 'Changed by second coordinator' },
+        data: { name: 'Changed by second coordinator' },
       }),
-      secondContext.request.post(
-        `/api/coops/${workspace.id}/schedules/${ownerSchedule.id}/publish`,
-        { headers: { origin }, data: {} },
-      ),
+      secondContext.request.patch(`/api/coops/${workspace.id}/sections/${ownerSection.id}`, {
+        headers: { origin },
+        data: { status: 'approved' },
+      }),
     ]);
     expect(foreignMutations.map((response) => response.status())).toEqual([
       403, 403, 403, 403, 403,
     ]);
 
-    const [ownerClassesAfterResponse, ownerSchedulesAfterResponse] = await Promise.all([
+    const [ownerClassesAfterResponse, ownerSectionsAfterResponse] = await Promise.all([
       page.request.get(`/api/coops/${workspace.id}/classes`, { headers: { origin } }),
-      page.request.get(`/api/coops/${workspace.id}/schedules`, { headers: { origin } }),
+      page.request.get(`/api/coops/${workspace.id}/sections`, { headers: { origin } }),
     ]);
     const ownerClassesAfter = CoopClassList.parse(await ownerClassesAfterResponse.json());
-    const ownerSchedulesAfter = ScheduleList.parse(await ownerSchedulesAfterResponse.json());
+    const ownerSectionsAfter = SectionList.parse(await ownerSectionsAfterResponse.json());
     expect(ownerClassesAfter).toEqual(ownerClassesBefore);
-    expect(ownerSchedulesAfter).toEqual(ownerSchedulesBefore);
     expect(ownerClassesAfter.items.map((item) => item.name)).toEqual(['Owner-only class record']);
-    expect(ownerSchedulesAfter.items.map((item) => item.title)).toEqual([
-      'Owner-only schedule record',
-    ]);
-    expect(ownerSchedulesAfter.items[0]?.status).toBe('draft');
+    expect(ownerSectionsAfter.items).toHaveLength(9);
+    const sectionAfter = ownerSectionsAfter.items.find((item) => item.id === ownerSection.id);
+    expect(sectionAfter?.name).toBe('2nd grade');
+    expect(sectionAfter?.status).toBe('draft');
   } finally {
     await secondContext.close();
   }
@@ -328,7 +335,7 @@ test('Workspace explains denied record reads and recovers when ownership is rest
   await page.getByLabel('Co-op name', { exact: true }).fill(secondCoop);
   await page.getByRole('button', { name: 'Create', exact: true }).click();
   await expect(page.getByRole('option', { name: secondCoop })).toBeAttached();
-  await expect(page.getByText('No schedules yet.')).toBeVisible();
+  await expect(page.getByText('No classes in Pre-K yet. Add the first one below.')).toBeVisible();
 
   const firstWorkspace = await prisma.coop.findFirst({
     where: { name: firstCoop },
@@ -345,12 +352,12 @@ test('Workspace explains denied record reads and recovers when ownership is rest
   const coopPicker = page.locator('#selected-coop');
   const firstRead = page.waitForResponse(
     (response) =>
-      response.url().endsWith(`/api/coops/${firstWorkspace.id}/classes`) &&
+      response.url().endsWith(`/api/coops/${firstWorkspace.id}/sections`) &&
       response.status() === 200,
   );
   await coopPicker.selectOption({ label: firstCoop });
   await firstRead;
-  await expect(page.getByText('No schedules yet.')).toBeVisible();
+  await expect(page.getByText('No classes in Pre-K yet. Add the first one below.')).toBeVisible();
 
   // Access comes from coordinator membership, so revoking it means changing the role.
   const setRole = (role: string) =>
@@ -360,12 +367,12 @@ test('Workspace explains denied record reads and recovers when ownership is rest
     });
   await setRole('former');
   try {
-    const forbiddenRead = await page.request.get(`/api/coops/${secondWorkspace.id}/classes`);
+    const forbiddenRead = await page.request.get(`/api/coops/${secondWorkspace.id}/sections`);
     expect(forbiddenRead.status()).toBe(403);
 
     const deniedClassRead = page.waitForResponse(
       (response) =>
-        response.url().endsWith(`/api/coops/${secondWorkspace.id}/classes`) &&
+        response.url().endsWith(`/api/coops/${secondWorkspace.id}/sections`) &&
         response.status() === 403,
     );
     await coopPicker.selectOption({ label: secondCoop });
@@ -377,13 +384,13 @@ test('Workspace explains denied record reads and recovers when ownership is rest
     await setRole('coordinator');
     const retryClassRead = page.waitForResponse(
       (response) =>
-        response.url().endsWith(`/api/coops/${secondWorkspace.id}/classes`) &&
+        response.url().endsWith(`/api/coops/${secondWorkspace.id}/sections`) &&
         response.status() === 200,
     );
     await page.getByRole('button', { name: 'Try again' }).click();
     await retryClassRead;
     await expect(recordError).toHaveCount(0);
-    await expect(page.getByText('No schedules yet.')).toBeVisible();
+    await expect(page.getByText('No classes in Pre-K yet. Add the first one below.')).toBeVisible();
   } finally {
     await setRole('coordinator');
   }

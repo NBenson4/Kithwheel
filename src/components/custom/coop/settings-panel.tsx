@@ -75,12 +75,14 @@ export function FamilyLinkCard({ coopId, settings, onSettings }: Omit<Props, 'on
       </div>
       <div className={styles.stack}>
         <p className={base.muted}>
-          One link for every family: it shows the published schedule, materials lists, a printable
-          copy, calendar subscription, and the registration form when registration is open. No
+          One link for every family: it shows the approved section schedules, materials lists, a
+          printable copy, calendar subscription, and the sign-up form when registration is open. No
           account needed.
         </p>
-        {!settings.hasCurrentSchedule && (
-          <p className={styles.note}>Publish a schedule so families have something to see.</p>
+        {!settings.sectionsApproved && (
+          <p className={styles.note}>
+            Approve a section’s schedule so families have something to see.
+          </p>
         )}
         {settings.shareUrl ? (
           <>

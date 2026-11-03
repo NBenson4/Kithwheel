@@ -30,14 +30,16 @@ async function childrenWithAttendance(
     where: { coopId },
     include: {
       family: { select: { id: true, parentName: true } },
+      section: { select: { name: true, position: true } },
       attendance: { where: { date: dateOnly(date) } },
     },
   });
-  // "Ages 5-7" before "Ages 11-14"; the tablet lists children by name for parents.
+  // In section order (Pre-K first); the tablet lists children by name for parents.
   return children.sort((a, b) =>
     by === 'name'
       ? natural.compare(a.name, b.name)
-      : natural.compare(a.ageGroup ?? '~', b.ageGroup ?? '~') || natural.compare(a.name, b.name),
+      : (a.section?.position ?? 999) - (b.section?.position ?? 999) ||
+        natural.compare(a.name, b.name),
   );
 }
 
@@ -53,7 +55,7 @@ export async function readAttendanceDay(coopId: string, date: string, timeZone: 
         childName: child.name,
         familyId: child.family.id,
         familyName: child.family.parentName,
-        ageGroup: child.ageGroup,
+        sectionName: child.section?.name ?? null,
         status: entry ? (entry.status === 'PRESENT' ? 'present' : 'absent') : null,
         checkedInAt: entry?.checkedInAt?.toISOString() ?? null,
         checkedOutAt: entry?.checkedOutAt?.toISOString() ?? null,
@@ -167,7 +169,7 @@ export async function readKioskDay(coop: { id: string; name: string; timeZone: s
         childId: child.id,
         name: child.name,
         familyName: child.family.parentName,
-        ageGroup: child.ageGroup,
+        sectionName: child.section?.name ?? null,
         checkedInAt:
           entry?.status === 'PRESENT' ? (entry.checkedInAt?.toISOString() ?? null) : null,
         checkedOutAt: entry?.checkedOutAt?.toISOString() ?? null,

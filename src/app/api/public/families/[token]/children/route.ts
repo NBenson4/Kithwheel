@@ -35,7 +35,7 @@ export async function POST(request: Request, context: RouteContext) {
         coopId: family.coopId,
         familyId: family.id,
         name: body.data.name,
-        ageGroup: body.data.ageGroup || null,
+        requestedSection: body.data.grade || null,
       },
     });
     return NextResponse.json(await readFamilyHome(token), { status: 201 });

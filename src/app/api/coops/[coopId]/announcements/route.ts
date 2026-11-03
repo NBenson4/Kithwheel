@@ -1,8 +1,9 @@
-// Announcements: saved for families' pages and emailed to every family (or one class).
+// Announcements: saved for families' pages and emailed to every family, one section, or the
+// families of children taking one class.
 import 'server-only';
 import { NextResponse } from 'next/server';
 import { requireCoopCoordinator, requireCoopEditor } from '@/lib/business/coordinator-auth';
-import { familyUrl } from '@/lib/business/families';
+import { childInclude, childSchedule, familyUrl } from '@/lib/business/families';
 import { guardOrigin, notFound, readBody, serverError } from '@/lib/business/route-helpers';
 import { AnnouncementCreate, AnnouncementList } from '@/lib/contracts/coop-features';
 import { prisma } from '@/lib/db';
@@ -18,13 +19,15 @@ async function readAnnouncements(coopId: string) {
     where: { coopId },
     orderBy: { createdAt: 'desc' },
     take: 100,
-    include: { class: { select: { name: true } } },
+    include: { class: { select: { name: true } }, section: { select: { name: true } } },
   });
   return AnnouncementList.parse({
     items: items.map((item) => ({
       id: item.id,
       title: item.title,
       body: item.body,
+      sectionId: item.sectionId,
+      sectionName: item.section?.name ?? null,
       classId: item.classId,
       className: item.class?.name ?? null,
       recipientCount: item.recipientCount,
@@ -49,34 +52,51 @@ export async function POST(request: Request, context: RouteContext) {
   const body = await readBody(request, AnnouncementCreate);
   if (!body.ok) return body.response;
   const classId = body.data.classId ?? null;
+  const sectionId = classId ? null : (body.data.sectionId ?? null);
 
   try {
     const coop = await prisma.coop.findUniqueOrThrow({
       where: { id: coopId },
       select: { name: true },
     });
-    let className: string | null = null;
+    let audience: string | null = null;
     if (classId) {
       const item = await prisma.coopClass.findFirst({
         where: { id: classId, coopId },
         select: { name: true },
       });
       if (!item) return notFound('Class');
-      className = item.name;
+      audience = item.name;
+    } else if (sectionId) {
+      const section = await prisma.coopSection.findFirst({
+        where: { id: sectionId, coopId },
+        select: { name: true },
+      });
+      if (!section) return notFound('Section');
+      audience = section.name;
     }
-    const families = await prisma.coopFamily.findMany({
-      where: {
-        coopId,
-        ...(classId
-          ? { children: { some: { enrollments: { some: { classId, status: 'ENROLLED' } } } } }
-          : {}),
+    const allFamilies = await prisma.coopFamily.findMany({
+      where: { coopId },
+      select: {
+        email: true,
+        accessToken: true,
+        children: { include: childInclude },
       },
-      select: { email: true, accessToken: true },
+    });
+    const families = allFamilies.filter((family) => {
+      if (sectionId) return family.children.some((child) => child.sectionId === sectionId);
+      if (classId) {
+        return family.children.some((child) =>
+          childSchedule(child, { approvedOnly: false }).some(({ item }) => item.id === classId),
+        );
+      }
+      return true;
     });
     const announcement = await prisma.coopAnnouncement.create({
       data: {
         coopId,
         classId,
+        sectionId,
         title: body.data.title,
         body: body.data.body,
         createdByUserId: access.userId,
@@ -92,7 +112,7 @@ export async function POST(request: Request, context: RouteContext) {
             coopName: coop.name,
             title: body.data.title,
             body: body.data.body,
-            className,
+            audience,
             url: familyUrl(family.accessToken),
           }),
         })),

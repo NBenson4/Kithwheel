@@ -1,90 +1,74 @@
-// Edit or delete class records only inside their coordinator's co-op.
+// Edit, move (to another section) or delete a class inside the coordinator's co-op.
 import 'server-only';
 import { NextResponse } from 'next/server';
 import { requireCoopEditor } from '@/lib/business/coordinator-auth';
-import { fillOpenSeats, notifyPromotions } from '@/lib/business/families';
+import { guardOrigin, notFound, readBody, serverError } from '@/lib/business/route-helpers';
 import { CoopClassList, CoopClassUpdate, DeletedRecord } from '@/lib/contracts/coops';
 import { prisma } from '@/lib/db';
-import { sameOrigin } from '@/lib/same-origin';
 
 type RouteContext = { params: Promise<{ coopId: string; classId: string }> };
 
 export async function PATCH(request: Request, context: RouteContext) {
-  if (!sameOrigin(request)) return NextResponse.json({ error: 'forbidden' }, { status: 403 });
+  const blocked = guardOrigin(request);
+  if (blocked) return blocked;
   const { coopId, classId } = await context.params;
   const access = await requireCoopEditor(coopId);
   if (!access.ok) return access.response;
-
-  try {
-    const parsed = CoopClassUpdate.safeParse(await request.json());
-    if (!parsed.success)
-      return NextResponse.json({ errors: parsed.error.flatten().fieldErrors }, { status: 400 });
-    const data = {
-      ...(parsed.data.name !== undefined ? { name: parsed.data.name } : {}),
-      ...(parsed.data.description !== undefined
-        ? { description: parsed.data.description || null }
-        : {}),
-      ...(parsed.data.teacher !== undefined ? { teacher: parsed.data.teacher || null } : {}),
-      ...(parsed.data.room !== undefined ? { room: parsed.data.room || null } : {}),
-      ...(parsed.data.time !== undefined ? { time: parsed.data.time || null } : {}),
-      ...(parsed.data.capacity !== undefined ? { capacity: parsed.data.capacity } : {}),
-      ...(parsed.data.feeCents !== undefined ? { feeCents: parsed.data.feeCents } : {}),
-      ...(parsed.data.materials !== undefined ? { materials: parsed.data.materials || null } : {}),
-    };
-    // A larger (or removed) capacity lets waitlisted children in.
-    const promotions = await prisma.$transaction(async (tx) => {
-      const result = await tx.coopClass.updateMany({ where: { id: classId, coopId }, data });
-      if (result.count === 0) return null;
-      return parsed.data.capacity !== undefined ? fillOpenSeats(tx, [classId]) : [];
+  const body = await readBody(request, CoopClassUpdate);
+  if (!body.ok) return body.response;
+  const item = await prisma.coopClass.findFirst({ where: { id: classId, coopId } });
+  if (!item) return notFound('Class');
+  const moving = body.data.sectionId !== undefined && body.data.sectionId !== item.sectionId;
+  if (moving) {
+    const section = await prisma.coopSection.findFirst({
+      where: { id: body.data.sectionId, coopId },
     });
-    if (promotions === null) {
-      return NextResponse.json({ error: 'class_not_found' }, { status: 404 });
-    }
-    await notifyPromotions(promotions);
-    const updated = await prisma.coopClass.findFirst({ where: { id: classId, coopId } });
-    if (!updated) return NextResponse.json({ error: 'class_not_found' }, { status: 404 });
+    if (!section) return notFound('Section');
+  }
+  try {
+    const last = moving
+      ? await prisma.coopClass.findFirst({
+          where: { sectionId: body.data.sectionId },
+          orderBy: { position: 'desc' },
+          select: { position: true },
+        })
+      : null;
+    const updated = await prisma.$transaction(async (tx) => {
+      const saved = await tx.coopClass.update({
+        where: { id: classId },
+        data: {
+          ...(body.data.name !== undefined ? { name: body.data.name } : {}),
+          ...(body.data.description !== undefined
+            ? { description: body.data.description || null }
+            : {}),
+          ...(body.data.teacher !== undefined ? { teacher: body.data.teacher || null } : {}),
+          ...(body.data.room !== undefined ? { room: body.data.room || null } : {}),
+          ...(body.data.time !== undefined ? { time: body.data.time || null } : {}),
+          ...(body.data.capacity !== undefined ? { capacity: body.data.capacity } : {}),
+          ...(body.data.feeCents !== undefined ? { feeCents: body.data.feeCents } : {}),
+          ...(body.data.materials !== undefined ? { materials: body.data.materials || null } : {}),
+          ...(moving
+            ? { sectionId: body.data.sectionId, position: (last?.position ?? -1) + 1 }
+            : {}),
+        },
+      });
+      // A class that changes sections drops the per-child changes tied to the old one.
+      if (moving) await tx.coopClassException.deleteMany({ where: { classId } });
+      return saved;
+    });
     return NextResponse.json(CoopClassList.shape.items.element.parse(updated));
   } catch {
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    return serverError();
   }
 }
 
 export async function DELETE(request: Request, context: RouteContext) {
-  if (!sameOrigin(request)) return NextResponse.json({ error: 'forbidden' }, { status: 403 });
+  const blocked = guardOrigin(request);
+  if (blocked) return blocked;
   const { coopId, classId } = await context.params;
   const access = await requireCoopEditor(coopId);
   if (!access.ok) return access.response;
-
-  try {
-    const item = await prisma.coopClass.findFirst({
-      where: { id: classId, coopId },
-      select: { id: true, name: true },
-    });
-    if (!item) return NextResponse.json({ error: 'class_not_found' }, { status: 404 });
-
-    // Deleting would silently change what families see, so a class in a published
-    // schedule has to be taken out of that schedule first.
-    const published = await prisma.coopSchedule.findFirst({
-      where: {
-        coopId,
-        status: 'PUBLISHED',
-        rotations: { some: { entries: { some: { classId } } } },
-      },
-      select: { title: true },
-    });
-    if (published) {
-      return NextResponse.json(
-        {
-          error: `“${item.name}” is in the published schedule “${published.title}”. Remove it from that schedule first.`,
-        },
-        { status: 409 },
-      );
-    }
-
-    // Draft and past schedules lose the class through the cascade on schedule entries.
-    await prisma.coopClass.deleteMany({ where: { id: classId, coopId } });
-    return NextResponse.json(DeletedRecord.parse({ id: classId }));
-  } catch {
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
-  }
+  const result = await prisma.coopClass.deleteMany({ where: { id: classId, coopId } });
+  if (!result.count) return notFound('Class');
+  return NextResponse.json(DeletedRecord.parse({ id: classId }));
 }

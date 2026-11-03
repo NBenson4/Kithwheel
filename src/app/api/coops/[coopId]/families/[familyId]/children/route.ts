@@ -1,9 +1,8 @@
-// Coordinator adds a child (and their classes) to an existing family.
+// Coordinator adds a child to an existing family, optionally straight into a section.
 import 'server-only';
 import { NextResponse } from 'next/server';
 import { readFamilyOverview } from '@/lib/business/coop-views';
 import { requireCoopEditor } from '@/lib/business/coordinator-auth';
-import { placeChild } from '@/lib/business/families';
 import { guardOrigin, notFound, readBody, serverError } from '@/lib/business/route-helpers';
 import { ChildInput } from '@/lib/contracts/coop-features';
 import { prisma } from '@/lib/db';
@@ -26,14 +25,21 @@ export async function POST(request: Request, context: RouteContext) {
   if (family._count.children >= 12) {
     return NextResponse.json({ error: 'A family can have up to 12 children.' }, { status: 409 });
   }
+  if (body.data.sectionId) {
+    const section = await prisma.coopSection.findFirst({
+      where: { id: body.data.sectionId, coopId },
+    });
+    if (!section) return notFound('Section');
+  }
   try {
-    await prisma.$transaction(async (tx) => {
-      const child = await tx.coopChild.create({
-        data: { coopId, familyId, name: body.data.name, ageGroup: body.data.ageGroup || null },
-      });
-      for (const classId of [...new Set(body.data.classIds)]) {
-        await placeChild(tx, coopId, child.id, classId);
-      }
+    await prisma.coopChild.create({
+      data: {
+        coopId,
+        familyId,
+        name: body.data.name,
+        requestedSection: body.data.grade || null,
+        sectionId: body.data.sectionId || null,
+      },
     });
     return NextResponse.json(await readFamilyOverview(coopId), { status: 201 });
   } catch {

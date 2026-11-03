@@ -29,18 +29,6 @@ export async function PATCH(request: Request, context: RouteContext) {
 
   try {
     const { termStart, termEnd, registrationNote, paymentInstructions, ...rest } = body.data;
-    if (rest.registrationOpen) {
-      const coop = await prisma.coop.findUnique({
-        where: { id: coopId },
-        select: { currentScheduleId: true },
-      });
-      if (!coop?.currentScheduleId) {
-        return NextResponse.json(
-          { error: 'Publish a schedule first, so families have classes to choose from.' },
-          { status: 409 },
-        );
-      }
-    }
     await prisma.coop.update({
       where: { id: coopId },
       data: {

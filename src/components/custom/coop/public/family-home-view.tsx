@@ -29,7 +29,7 @@ export function FamilyHomeView({ token }: { token: string }) {
   const [failed, setFailed] = useState<'missing' | 'error' | null>(null);
   const [busy, setBusy] = useState(false);
   const [hours, setHours] = useState({ date: localToday(), hours: '', description: '' });
-  const [newChild, setNewChild] = useState<{ name: string; ageGroup: string } | null>(null);
+  const [newChild, setNewChild] = useState<{ name: string; grade: string } | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -82,7 +82,6 @@ export function FamilyHomeView({ token }: { token: string }) {
     );
   }
 
-  const ageGroups = home.schedule?.rotations.map((rotation) => rotation.ageGroup) ?? [];
   const { volunteer, fees } = home;
   const percent = volunteer.requiredMinutes
     ? Math.min(100, Math.round((volunteer.approvedMinutes / volunteer.requiredMinutes) * 100))
@@ -104,43 +103,45 @@ export function FamilyHomeView({ token }: { token: string }) {
           Your children’s classes
         </h2>
         <p className={base.muted} style={{ margin: 0 }}>
-          Your co-op’s coordinators place children in classes. For changes, reply to any email from
-          your co-op.
+          Your co-op’s coordinators place each child in a grade section. For changes, reply to any
+          email from your co-op.
         </p>
         {home.children.map((child) => (
           <div className={styles.childCard} key={child.id}>
             <span className={styles.rowTitle}>
               {child.name}
-              {child.ageGroup ? <span className={base.muted}> · {child.ageGroup}</span> : null}
+              {child.sectionName ? (
+                <span className={base.muted}> · {child.sectionName}</span>
+              ) : null}
             </span>
-            {child.enrollments.length ? (
+            {child.classes.length ? (
               <div className={styles.stack} style={{ gap: 8 }}>
-                {child.enrollments.map((entry) => (
+                {child.classes.map((item) => (
                   <ClassCard
-                    key={entry.id}
-                    item={entry.class}
+                    key={item.id}
+                    item={item}
                     extra={
-                      <span className={base.buttonRow} style={{ marginTop: 4 }}>
-                        <span
-                          className={`${styles.pill} ${entry.status === 'enrolled' ? styles.pillGood : styles.pillWarn}`}
-                        >
-                          {entry.status === 'enrolled'
-                            ? 'Enrolled'
-                            : `Waitlist${entry.waitlistPosition ? ` #${entry.waitlistPosition}` : ''}`}
+                      item.source === 'added' && item.sectionName ? (
+                        <span className={styles.rowMeta}>
+                          <span className={styles.pill}>From {item.sectionName}</span>
                         </span>
-                      </span>
+                      ) : undefined
                     }
                   />
                 ))}
               </div>
             ) : (
               <p className={base.muted}>
-                Not placed in classes yet. Your coordinators will let you know.
+                {!child.sectionName
+                  ? 'Not placed in a section yet. Your coordinators will let you know.'
+                  : child.awaitingApproval
+                    ? `${child.sectionName}’s schedule isn’t ready yet. It appears here once your coordinators approve it.`
+                    : 'No classes yet.'}
               </p>
             )}
           </div>
         ))}
-        {home.registrationOpen && home.schedule && (
+        {home.registrationOpen && (
           <div className={styles.noPrint}>
             {newChild ? (
               <form
@@ -167,17 +168,16 @@ export function FamilyHomeView({ token }: { token: string }) {
                     />
                   </label>
                   <label className={base.smallLabel}>
-                    Age group
+                    Grade
                     <select
                       className={base.select}
-                      value={newChild.ageGroup}
-                      onChange={(event) =>
-                        setNewChild({ ...newChild, ageGroup: event.target.value })
-                      }
+                      value={newChild.grade}
+                      required
+                      onChange={(event) => setNewChild({ ...newChild, grade: event.target.value })}
                     >
                       <option value="">Choose…</option>
-                      {ageGroups.map((group) => (
-                        <option key={group}>{group}</option>
+                      {home.grades.map((grade) => (
+                        <option key={grade}>{grade}</option>
                       ))}
                     </select>
                   </label>
@@ -199,7 +199,7 @@ export function FamilyHomeView({ token }: { token: string }) {
               <button
                 className={base.quietButton}
                 type="button"
-                onClick={() => setNewChild({ name: '', ageGroup: '' })}
+                onClick={() => setNewChild({ name: '', grade: '' })}
               >
                 Add another child
               </button>
@@ -220,6 +220,7 @@ export function FamilyHomeView({ token }: { token: string }) {
                 <span className={styles.rowMeta}>
                   {formatTimestamp(item.createdAt)}
                   {item.className ? ` · ${item.className}` : ''}
+                  {item.sectionName ? ` · ${item.sectionName}` : ''}
                 </span>
                 <p
                   className={`${styles.prewrap} ${base.description}`}

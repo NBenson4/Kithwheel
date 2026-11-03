@@ -443,6 +443,41 @@
   font-weight: 700;
 }
 
+/* ── Grade sections (Schedules tab) ─────────────────────────────── */
+
+.sectionsLayout {
+  display: grid;
+  align-items: start;
+  gap: 18px;
+  grid-template-columns: minmax(220px, 300px) minmax(0, 1fr);
+}
+
+.sectionList {
+  display: grid;
+  gap: 6px;
+}
+
+@media (max-width: 900px) {
+  .sectionsLayout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* On phones the sections scroll sideways as one row, so the schedule stays in view. */
+  .sectionList {
+    display: flex;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    scroll-snap-type: x proximity;
+  }
+
+  .sectionList > button {
+    flex: 0 0 auto;
+    width: auto;
+    min-width: 170px;
+    scroll-snap-align: start;
+  }
+}
+
 /* ── Class placement ─────────────────────────────────────────────── */
 
 .placementLayout {

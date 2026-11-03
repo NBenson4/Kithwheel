@@ -1,7 +1,9 @@
-// Response shaping for the coordinator's family, settings and team views, and for the
-// family-facing pages.
+// Response shaping for the coordinator's sections, families, settings and team views, and for
+// the family-facing pages.
 import 'server-only';
 import {
+  type ChildWithSchedule,
+  childSchedule,
   coopCalendarUrl,
   type FamilyWithDetails,
   familyBalance,
@@ -11,18 +13,20 @@ import {
   isoDay,
   kioskUrl,
   readPublicSchedule,
-  seatCounts,
+  readSectionRows,
   shareUrl,
   toPublicClass,
   volunteerSummary,
 } from '@/lib/business/families';
 import {
-  type ClassRoster,
+  type ChildRecord,
   CoopSettings,
   FamilyHome,
   FamilyOverview,
   type FamilyRecord,
 } from '@/lib/contracts/coop-features';
+import { SectionList } from '@/lib/contracts/coops';
+import { clashes } from '@/lib/coop/placement';
 import { prisma } from '@/lib/db';
 
 export function calendarReady(coop: {
@@ -35,13 +39,17 @@ export function calendarReady(coop: {
 
 export async function readSettings(coopId: string) {
   const coop = await prisma.coop.findUniqueOrThrow({ where: { id: coopId } });
-  const [classes, classFees, families, coordinators, pendingInvites] = await Promise.all([
+  const [classes, classFees, families, coordinators, pendingInvites, sections] = await Promise.all([
     prisma.coopClass.count({ where: { coopId } }),
     prisma.coopClass.count({ where: { coopId, feeCents: { gt: 0 } } }),
     prisma.coopFamily.count({ where: { coopId } }),
     prisma.coopMembership.count({ where: { coopId, role: 'coordinator' } }),
     prisma.coopInvite.count({
       where: { coopId, acceptedAt: null, expiresAt: { gt: new Date() } },
+    }),
+    prisma.coopSection.findMany({
+      where: { coopId },
+      select: { status: true, _count: { select: { classes: true } } },
     }),
   ]);
   return CoopSettings.parse({
@@ -57,9 +65,71 @@ export async function readSettings(coopId: string) {
     childFeeCents: coop.childFeeCents,
     paymentInstructions: coop.paymentInstructions,
     volunteerMinutesRequired: coop.volunteerMinutesRequired,
-    hasCurrentSchedule: coop.currentScheduleId !== null,
+    sectionsApproved: sections.filter(
+      (section) => section.status === 'APPROVED' && section._count.classes,
+    ).length,
+    sectionsWithClasses: sections.filter((section) => section._count.classes).length,
     counts: { classes, classFees, families, coordinators, pendingInvites },
   });
+}
+
+/** Sections with their classes, for the Schedules tab. */
+export async function readSections(coopId: string) {
+  const [sections, unfiled] = await Promise.all([
+    readSectionRows(coopId),
+    prisma.coopClass.findMany({
+      where: { coopId, sectionId: null },
+      orderBy: { name: 'asc' },
+      select: {
+        id: true,
+        coopId: true,
+        sectionId: true,
+        position: true,
+        name: true,
+        description: true,
+        teacher: true,
+        room: true,
+        time: true,
+        materials: true,
+        feeCents: true,
+        capacity: true,
+      },
+    }),
+  ]);
+  return SectionList.parse({
+    items: sections.map((section) => ({
+      id: section.id,
+      name: section.name,
+      position: section.position,
+      status: section.status === 'APPROVED' ? 'approved' : 'draft',
+      approvedAt: section.approvedAt?.toISOString() ?? null,
+      childCount: section._count.children,
+      classes: section.classes,
+    })),
+    unfiledClasses: unfiled,
+  });
+}
+
+export function toChildRecord(child: ChildWithSchedule): ChildRecord {
+  const schedule = childSchedule(child, { approvedOnly: false });
+  return {
+    id: child.id,
+    name: child.name,
+    sectionId: child.sectionId,
+    sectionName: child.section?.name ?? null,
+    requestedSection: child.requestedSection,
+    classes: schedule.map(({ item, source, sectionName }) => ({
+      classId: item.id,
+      className: item.name,
+      time: item.time,
+      sectionName,
+      source,
+    })),
+    skipped: child.exceptions
+      .filter((entry) => entry.kind === 'SKIP' && entry.class.sectionId === child.sectionId)
+      .map((entry) => ({ classId: entry.class.id, className: entry.class.name })),
+    clashes: clashes(schedule.map(({ item }) => item)),
+  };
 }
 
 function toFamilyRecord(
@@ -74,17 +144,7 @@ function toFamilyRecord(
     notes: family.notes,
     familyUrl: familyUrl(family.accessToken),
     createdAt: family.createdAt.toISOString(),
-    children: family.children.map((child) => ({
-      id: child.id,
-      name: child.name,
-      ageGroup: child.ageGroup,
-      enrollments: child.enrollments.map((entry) => ({
-        id: entry.id,
-        classId: entry.classId,
-        className: entry.class.name,
-        status: entry.status === 'ENROLLED' ? 'enrolled' : 'waitlisted',
-      })),
-    })),
+    children: family.children.map(toChildRecord),
     balance: familyBalance(family, coop),
     charges: family.charges.map((charge) => ({
       id: charge.id,
@@ -108,49 +168,36 @@ export async function readFamilyOverview(coopId: string) {
     where: { id: coopId },
     select: { familyFeeCents: true, childFeeCents: true, volunteerMinutesRequired: true },
   });
-  const [families, classes] = await Promise.all([
+  const [families, sections] = await Promise.all([
     prisma.coopFamily.findMany({
       where: { coopId },
       include: familyInclude,
       orderBy: { parentName: 'asc' },
     }),
-    prisma.coopClass.findMany({
-      where: { coopId },
-      orderBy: { name: 'asc' },
-      select: {
-        id: true,
-        name: true,
-        capacity: true,
-        feeCents: true,
-        enrollments: {
-          orderBy: { createdAt: 'asc' },
-          select: {
-            id: true,
-            status: true,
-            child: { select: { name: true, family: { select: { id: true, parentName: true } } } },
-          },
-        },
-      },
-    }),
+    readSectionRows(coopId),
   ]);
-  const rosters: ClassRoster[] = classes.map((item) => ({
-    id: item.id,
-    name: item.name,
-    capacity: item.capacity,
-    feeCents: item.feeCents,
-    enrolled: item.enrollments.filter((entry) => entry.status === 'ENROLLED').length,
-    waitlisted: item.enrollments.filter((entry) => entry.status === 'WAITLISTED').length,
-    roster: item.enrollments.map((entry) => ({
-      enrollmentId: entry.id,
-      childName: entry.child.name,
-      familyId: entry.child.family.id,
-      familyName: entry.child.family.parentName,
-      status: entry.status === 'ENROLLED' ? 'enrolled' : 'waitlisted',
-    })),
-  }));
+  const records = families.map((family) => toFamilyRecord(family, coop));
+  const counts = new Map<string, number>();
+  for (const family of records) {
+    for (const child of family.children) {
+      for (const item of child.classes)
+        counts.set(item.classId, (counts.get(item.classId) ?? 0) + 1);
+    }
+  }
   return FamilyOverview.parse({
-    families: families.map((family) => toFamilyRecord(family, coop)),
-    classes: rosters,
+    families: records,
+    sections: sections.map((section) => ({
+      id: section.id,
+      name: section.name,
+      status: section.status === 'APPROVED' ? 'approved' : 'draft',
+      classes: section.classes.map((item) => ({
+        id: item.id,
+        name: item.name,
+        time: item.time,
+        capacity: item.capacity,
+        count: counts.get(item.id) ?? 0,
+      })),
+    })),
     volunteerMinutesRequired: coop.volunteerMinutesRequired,
   });
 }
@@ -163,28 +210,33 @@ export async function readFamilyHome(accessToken: string) {
   });
   if (!family) return null;
   const { coop } = family;
-  const enrolledClassIds = family.children.flatMap((child) =>
-    child.enrollments.filter((entry) => entry.status === 'ENROLLED').map((entry) => entry.classId),
-  );
-  const allClassIds = family.children.flatMap((child) =>
-    child.enrollments.map((entry) => entry.classId),
-  );
-  const [schedule, counts, announcements, waitlists, attendance] = await Promise.all([
+  const childSchedules = family.children.map((child) => ({
+    child,
+    schedule: childSchedule(child, { approvedOnly: true }),
+  }));
+  const classIds = childSchedules.flatMap(({ schedule }) => schedule.map(({ item }) => item.id));
+  const sectionIds = family.children
+    .map((child) => child.sectionId)
+    .filter((id): id is string => Boolean(id));
+  const [schedule, sections, announcements, attendance] = await Promise.all([
     readPublicSchedule(coop.id),
-    seatCounts(allClassIds),
+    prisma.coopSection.findMany({
+      where: { coopId: coop.id },
+      orderBy: { position: 'asc' },
+      select: { name: true },
+    }),
     prisma.coopAnnouncement.findMany({
       where: {
         coopId: coop.id,
-        OR: [{ classId: null }, { classId: { in: enrolledClassIds } }],
+        OR: [
+          { classId: null, sectionId: null },
+          { classId: { in: classIds } },
+          { sectionId: { in: sectionIds } },
+        ],
       },
       orderBy: { createdAt: 'desc' },
       take: 50,
-      include: { class: { select: { name: true } } },
-    }),
-    prisma.coopEnrollment.findMany({
-      where: { classId: { in: allClassIds }, status: 'WAITLISTED' },
-      orderBy: { createdAt: 'asc' },
-      select: { id: true, classId: true },
+      include: { class: { select: { name: true } }, section: { select: { name: true } } },
     }),
     prisma.coopAttendance.findMany({
       where: { child: { familyId: family.id } },
@@ -192,29 +244,22 @@ export async function readFamilyHome(accessToken: string) {
       include: { child: { select: { name: true } } },
     }),
   ]);
-  const positions = new Map<string, number>();
-  const seen = new Map<string, number>();
-  for (const entry of waitlists) {
-    const next = (seen.get(entry.classId) ?? 0) + 1;
-    seen.set(entry.classId, next);
-    positions.set(entry.id, next);
-  }
   const balance = familyBalance(family, coop);
   const volunteer = volunteerSummary(family);
   return FamilyHome.parse({
     coopName: coop.name,
     parentName: family.parentName,
     email: family.email,
-    children: family.children.map((child) => ({
+    grades: sections.map((section) => section.name),
+    children: childSchedules.map(({ child, schedule: classes }) => ({
       id: child.id,
       name: child.name,
-      ageGroup: child.ageGroup,
-      enrollments: child.enrollments.map((entry) => ({
-        id: entry.id,
-        classId: entry.classId,
-        status: entry.status === 'ENROLLED' ? 'enrolled' : 'waitlisted',
-        waitlistPosition: positions.get(entry.id) ?? null,
-        class: toPublicClass(entry.class, counts),
+      sectionName: child.section?.name ?? null,
+      awaitingApproval: Boolean(child.section && child.section.status !== 'APPROVED'),
+      classes: classes.map(({ item, source, sectionName }) => ({
+        ...toPublicClass(item),
+        source,
+        sectionName,
       })),
     })),
     schedule,
@@ -224,6 +269,7 @@ export async function readFamilyHome(accessToken: string) {
       title: item.title,
       body: item.body,
       className: item.class?.name ?? null,
+      sectionName: item.section?.name ?? null,
       createdAt: item.createdAt.toISOString(),
     })),
     fees: {

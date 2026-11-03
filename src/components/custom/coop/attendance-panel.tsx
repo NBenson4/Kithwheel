@@ -137,7 +137,7 @@ export function AttendancePanel({ coopId, settings, onSettings }: Props) {
   const absent = day.children.filter((child) => child.status === 'absent').length;
   const groups = new Map<string, typeof day.children>();
   for (const child of day.children) {
-    const key = child.ageGroup || 'No age group';
+    const key = child.sectionName || 'Not in a section';
     groups.set(key, [...(groups.get(key) ?? []), child]);
   }
 

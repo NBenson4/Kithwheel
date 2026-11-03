@@ -1,9 +1,8 @@
-// Co-op records and coordinator-managed schedules.
+// Co-op records: grade sections with their schedules, families, and coordination.
 model Coop {
   id                       String             @id @default(cuid())
   name                     String
   createdByUserId          String
-  currentScheduleId        String?
   // Billing. The free trial is tracked here; Stripe is only involved once a co-op subscribes.
   trialEndsAt              DateTime           @default(dbgenerated("(now() + '30 days'::interval)"))
   stripeCustomerId         String?            @unique
@@ -32,7 +31,7 @@ model Coop {
   updatedAt                DateTime           @updatedAt
   memberships              CoopMembership[]
   classes                  CoopClass[]
-  schedules                CoopSchedule[]
+  sections                 CoopSection[]
   invites                  CoopInvite[]
   families                 CoopFamily[]
   announcements            CoopAnnouncement[]
@@ -78,52 +77,38 @@ model CoopFamily {
 }
 
 model CoopChild {
-  id          String           @id @default(cuid())
-  coopId      String
-  familyId    String
-  name        String
-  ageGroup    String?
-  createdAt   DateTime         @default(now())
-  family      CoopFamily       @relation(fields: [familyId], references: [id], onDelete: Cascade)
-  enrollments CoopEnrollment[]
-  attendance  CoopAttendance[]
+  id               String               @id @default(cuid())
+  coopId           String
+  familyId         String
+  name             String
+  // The section a coordinator assigned; the child follows that section's whole schedule.
+  sectionId        String?
+  // The grade the family gave when registering, until a coordinator assigns a section.
+  requestedSection String?
+  createdAt        DateTime             @default(now())
+  family           CoopFamily           @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  section          CoopSection?         @relation(fields: [sectionId], references: [id], onDelete: SetNull)
+  exceptions       CoopClassException[]
+  attendance       CoopAttendance[]
 
   @@index([familyId])
-}
-
-model CoopEnrollment {
-  id         String               @id @default(cuid())
-  coopId     String
-  childId    String
-  classId    String
-  status     CoopEnrollmentStatus @default(ENROLLED)
-  createdAt  DateTime             @default(now())
-  promotedAt DateTime?
-  child      CoopChild            @relation(fields: [childId], references: [id], onDelete: Cascade)
-  class      CoopClass            @relation(fields: [classId], references: [id], onDelete: Cascade)
-
-  @@unique([childId, classId])
-  @@index([classId, status, createdAt])
-  @@index([coopId])
-}
-
-enum CoopEnrollmentStatus {
-  ENROLLED
-  WAITLISTED
+  @@index([sectionId])
 }
 
 model CoopAnnouncement {
-  id              String     @id @default(cuid())
+  id              String       @id @default(cuid())
   coopId          String
-  // Null means every family; otherwise families with a child enrolled in this class.
+  // Both null: every family. Otherwise families with a child in this section or class.
+  sectionId       String?
   classId         String?
   title           String
   body            String
   createdByUserId String
-  recipientCount  Int        @default(0)
-  createdAt       DateTime   @default(now())
-  coop            Coop       @relation(fields: [coopId], references: [id], onDelete: Cascade)
-  class           CoopClass? @relation(fields: [classId], references: [id], onDelete: SetNull)
+  recipientCount  Int          @default(0)
+  createdAt       DateTime     @default(now())
+  coop            Coop         @relation(fields: [coopId], references: [id], onDelete: Cascade)
+  class           CoopClass?   @relation(fields: [classId], references: [id], onDelete: SetNull)
+  section         CoopSection? @relation(fields: [sectionId], references: [id], onDelete: SetNull)
 
   @@index([coopId, createdAt])
 }
@@ -192,71 +177,29 @@ model CoopMembership {
 }
 
 model CoopClass {
-  id              String              @id @default(cuid())
-  coopId          String
-  name            String
-  description     String?
-  teacher         String?
-  room            String?
-  time            String?
-  // Seats; null means no limit. Extra sign-ups join the waitlist.
-  capacity        Int?
-  feeCents        Int                 @default(0)
-  materials       String?
-  createdAt       DateTime            @default(now())
-  updatedAt       DateTime            @updatedAt
-  coop            Coop                @relation(fields: [coopId], references: [id], onDelete: Cascade)
-  scheduleEntries CoopScheduleEntry[]
-  enrollments     CoopEnrollment[]
-  announcements   CoopAnnouncement[]
+  id            String               @id @default(cuid())
+  coopId        String
+  name          String
+  description   String?
+  teacher       String?
+  room          String?
+  time          String?
+  // The grade section this class belongs to (null only until a coordinator files it).
+  sectionId     String?
+  position      Int                  @default(0)
+  // Seats; null means no limit. Shown as a warning when a class is over.
+  capacity      Int?
+  feeCents      Int                  @default(0)
+  materials     String?
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+  coop          Coop                 @relation(fields: [coopId], references: [id], onDelete: Cascade)
+  section       CoopSection?         @relation(fields: [sectionId], references: [id], onDelete: SetNull)
+  exceptions    CoopClassException[]
+  announcements CoopAnnouncement[]
 
   @@index([coopId, name])
-}
-
-model CoopSchedule {
-  id          String                 @id @default(cuid())
-  coopId      String
-  title       String
-  status      CoopScheduleStatus     @default(DRAFT)
-  publishedAt DateTime?
-  withdrawnAt DateTime?
-  createdAt   DateTime               @default(now())
-  updatedAt   DateTime               @updatedAt
-  coop        Coop                   @relation(fields: [coopId], references: [id], onDelete: Cascade)
-  rotations   CoopScheduleRotation[]
-
-  @@index([coopId, status, updatedAt])
-}
-
-model CoopScheduleRotation {
-  id         String              @id @default(cuid())
-  scheduleId String
-  ageGroup   String
-  position   Int
-  schedule   CoopSchedule        @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
-  entries    CoopScheduleEntry[]
-
-  @@unique([scheduleId, position])
-}
-
-model CoopScheduleEntry {
-  id         String               @id @default(cuid())
-  rotationId String
-  classId    String
-  position   Int
-  rotation   CoopScheduleRotation @relation(fields: [rotationId], references: [id], onDelete: Cascade)
-  class      CoopClass            @relation(fields: [classId], references: [id], onDelete: Cascade)
-
-  @@unique([rotationId, position])
-  @@unique([rotationId, classId])
-  @@index([classId])
-}
-
-enum CoopScheduleStatus {
-  DRAFT
-  PUBLISHED
-  WITHDRAWN
-  ARCHIVED
+  @@index([sectionId, position])
 }
 
 // Stripe webhook events already handled, so retried deliveries are skipped.
@@ -287,4 +230,50 @@ model CoopAttendance {
 enum CoopAttendanceStatus {
   PRESENT
   ABSENT
+}
+
+// A grade section (Pre-K, Kindergarten, 1st grade ...). Each has its own schedule of classes,
+// which families see once a coordinator approves it.
+model CoopSection {
+  id            String             @id @default(cuid())
+  coopId        String
+  name          String
+  position      Int
+  status        CoopSectionStatus  @default(DRAFT)
+  approvedAt    DateTime?
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  coop          Coop               @relation(fields: [coopId], references: [id], onDelete: Cascade)
+  classes       CoopClass[]
+  children      CoopChild[]
+  announcements CoopAnnouncement[]
+
+  @@index([coopId, position])
+}
+
+enum CoopSectionStatus {
+  DRAFT
+  APPROVED
+}
+
+// A case-by-case change to one child's schedule: skip one of their section's classes, or
+// take a single class from another section.
+model CoopClassException {
+  id        String                 @id @default(cuid())
+  coopId    String
+  childId   String
+  classId   String
+  kind      CoopClassExceptionKind
+  createdAt DateTime               @default(now())
+  child     CoopChild              @relation(fields: [childId], references: [id], onDelete: Cascade)
+  class     CoopClass              @relation(fields: [classId], references: [id], onDelete: Cascade)
+
+  @@unique([childId, classId])
+  @@index([classId])
+  @@index([coopId])
+}
+
+enum CoopClassExceptionKind {
+  ADD
+  SKIP
 }

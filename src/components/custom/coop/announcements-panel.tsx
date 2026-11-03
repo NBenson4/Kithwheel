@@ -1,4 +1,5 @@
-// Announcements tab: write to every family or one class; each family gets an email.
+// Announcements tab: write to every family, one grade section, or the families taking one
+// class; each family gets an email.
 'use client';
 
 import { Send } from 'lucide-react';
@@ -10,16 +11,17 @@ import { errorMessage, formatTimestamp, post } from '@/components/custom/coop/sh
 import base from '@/components/custom/scheduling/scheduling.module.css';
 import { apiFetch } from '@/lib/api-client';
 import { type Announcement, AnnouncementList } from '@/lib/contracts/coop-features';
-import type { CoopClassRecord } from '@/lib/contracts/coops';
+import type { SectionRecord } from '@/lib/contracts/coops';
 
-type Props = { coopId: string; classes: CoopClassRecord[] };
+type Props = { coopId: string; sections: SectionRecord[] };
 
-export function AnnouncementsPanel({ coopId, classes }: Props) {
+export function AnnouncementsPanel({ coopId, sections }: Props) {
   const [items, setItems] = useState<Announcement[] | null>(null);
   const [error, setError] = useState(false);
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
-  const [classId, setClassId] = useState('');
+  // "" = every family, "section:<id>" or "class:<id>".
+  const [audience, setAudience] = useState('');
   const [confirming, setConfirming] = useState(false);
   const [sending, setSending] = useState(false);
 
@@ -38,7 +40,16 @@ export function AnnouncementsPanel({ coopId, classes }: Props) {
     void load();
   }, [load]);
 
-  const selectedClass = classes.find((item) => item.id === classId);
+  const [kind, targetId] = audience.split(':');
+  const classes = sections.flatMap((section) => section.classes);
+  const selectedClass = kind === 'class' ? classes.find((item) => item.id === targetId) : undefined;
+  const selectedSection =
+    kind === 'section' ? sections.find((section) => section.id === targetId) : undefined;
+  const audienceLabel = selectedClass
+    ? `families taking ${selectedClass.name}`
+    : selectedSection
+      ? `families in ${selectedSection.name}`
+      : 'every family';
 
   function insertMaterials() {
     if (!selectedClass?.materials) return;
@@ -57,7 +68,12 @@ export function AnnouncementsPanel({ coopId, classes }: Props) {
     setSending(true);
     try {
       const result = await apiFetch(`/api/coops/${coopId}/announcements`, {
-        ...post({ title, body, classId: classId || null }),
+        ...post({
+          title,
+          body,
+          sectionId: selectedSection?.id ?? null,
+          classId: selectedClass?.id ?? null,
+        }),
         schema: AnnouncementList,
       });
       setItems(result.items);
@@ -91,18 +107,31 @@ export function AnnouncementsPanel({ coopId, classes }: Props) {
             <select
               id="announcement-audience"
               className={base.select}
-              value={classId}
+              value={audience}
               onChange={(event) => {
-                setClassId(event.target.value);
+                setAudience(event.target.value);
                 setConfirming(false);
               }}
             >
               <option value="">Every family</option>
-              {classes.map((item) => (
-                <option key={item.id} value={item.id}>
-                  Families in {item.name}
-                </option>
-              ))}
+              <optgroup label="A grade section">
+                {sections.map((section) => (
+                  <option key={section.id} value={`section:${section.id}`}>
+                    Families in {section.name}
+                  </option>
+                ))}
+              </optgroup>
+              {sections
+                .filter((section) => section.classes.length)
+                .map((section) => (
+                  <optgroup key={section.id} label={`One class · ${section.name}`}>
+                    {section.classes.map((item) => (
+                      <option key={item.id} value={`class:${item.id}`}>
+                        Families taking {item.name}
+                      </option>
+                    ))}
+                  </optgroup>
+                ))}
             </select>
           </label>
           <label className={base.smallLabel} htmlFor="announcement-title">
@@ -146,9 +175,7 @@ export function AnnouncementsPanel({ coopId, classes }: Props) {
           </p>
           {confirming && (
             <p className={styles.note} role="alert">
-              Send “{title}” to{' '}
-              {selectedClass ? `families in ${selectedClass.name}` : 'every family'}? Press send
-              again to confirm.
+              Send “{title}” to {audienceLabel}? Press send again to confirm.
             </p>
           )}
           <div className={base.buttonRow}>
@@ -188,8 +215,12 @@ export function AnnouncementsPanel({ coopId, classes }: Props) {
                       <span className={styles.rowTitle}>{item.title}</span>
                       <span className={styles.rowMeta}>
                         {formatTimestamp(item.createdAt)} ·{' '}
-                        {item.className ? `Families in ${item.className}` : 'Every family'} ·{' '}
-                        {item.recipientCount} emailed
+                        {item.className
+                          ? `Families taking ${item.className}`
+                          : item.sectionName
+                            ? `Families in ${item.sectionName}`
+                            : 'Every family'}{' '}
+                        · {item.recipientCount} emailed
                       </span>
                     </span>
                   </summary>

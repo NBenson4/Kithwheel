@@ -139,37 +139,24 @@ export function coordinatorInviteEmail(input: {
   return { subject: `${input.invitedBy} invited you to coordinate ${input.coopName}`, html, text };
 }
 
-type Placement = { childName: string; className: string };
-
 /** Sent to a family after they register (or a coordinator adds them). */
 export function familyWelcomeEmail(input: {
   coopName: string;
   parentName: string;
   url: string;
-  enrolled: Placement[];
-  waitlisted: Placement[];
+  children: string[];
 }): EmailContent {
-  const enrolled = input.enrolled.map((item) => `• ${item.childName}: ${item.className}`);
-  const waitlisted = input.waitlisted.map(
-    (item) => `• ${item.childName}: ${item.className} (waitlist)`,
-  );
   const { html, text } = renderEmail({
     heading: `You’re registered with ${input.coopName}`,
     body: [
-      `Hi ${input.parentName}, thanks for registering.`,
-      ...(enrolled.length ? ['Classes:', ...enrolled] : []),
-      ...(waitlisted.length
-        ? ['Waitlisted (we’ll email you if a seat opens):', ...waitlisted]
-        : []),
-      ...(!enrolled.length && !waitlisted.length
-        ? ['Your coordinators will place your children in classes and let you know.']
-        : []),
-      'Your family page has the schedule, materials lists, announcements, fees and volunteer hours. Keep this link private; anyone with it can see your family’s page.',
+      `Hi ${input.parentName}, thanks for registering ${input.children.join(', ')}.`,
+      'Your coordinators will place each child in their grade’s classes and let you know. Once they do, your family page shows every class, materials list and announcement.',
+      'Your family page also has fees and volunteer hours. Keep this link private; anyone with it can see your family’s page.',
     ],
     cta: { label: 'Open your family page', url: input.url },
     footer: `You received this because you registered with ${input.coopName} on Kithwheel.`,
   });
-  return { subject: `Registration confirmed: ${input.coopName}`, html, text };
+  return { subject: `Registration received: ${input.coopName}`, html, text };
 }
 
 /** Re-sends a family's private link. */
@@ -190,32 +177,12 @@ export function familyLinkEmail(input: {
   return { subject: `Your ${input.coopName} family page`, html, text };
 }
 
-/** A waitlisted child got a seat. */
-export function seatOpenedEmail(input: {
-  coopName: string;
-  parentName: string;
-  childName: string;
-  className: string;
-  url: string;
-}): EmailContent {
-  const { html, text } = renderEmail({
-    heading: `${input.childName} is in ${input.className}`,
-    body: [
-      `Hi ${input.parentName}, a seat opened in ${input.className} at ${input.coopName}, and ${input.childName} has moved off the waitlist into the class.`,
-      'If you no longer need the seat, you can drop the class from your family page so the next family can have it.',
-    ],
-    cta: { label: 'Open your family page', url: input.url },
-    footer: `You received this because your family is registered with ${input.coopName} on Kithwheel.`,
-  });
-  return { subject: `A seat opened: ${input.className}`, html, text };
-}
-
 /** A coordinator's announcement to families. */
 export function announcementEmail(input: {
   coopName: string;
   title: string;
   body: string;
-  className: string | null;
+  audience: string | null;
   url: string;
 }): EmailContent {
   const paragraphs = input.body
@@ -224,7 +191,7 @@ export function announcementEmail(input: {
     .filter(Boolean);
   const { html, text } = renderEmail({
     heading: input.title,
-    body: [...(input.className ? [`For families in ${input.className}`] : []), ...paragraphs],
+    body: [...(input.audience ? [`For families in ${input.audience}`] : []), ...paragraphs],
     cta: { label: 'Open your family page', url: input.url },
     footer: `Sent by ${input.coopName} through Kithwheel.`,
   });
