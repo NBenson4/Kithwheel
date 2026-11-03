@@ -74,7 +74,15 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             user-owned src/components/providers.tsx (AppProviders, below), which wraps
             the whole app — add providers there, not here. The `nonce` is available to
             CSP-aware providers via the `x-nonce` header in proxy.ts. */}
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem nonce={nonce}>
+        {/* Kithwheel is designed in one light palette; phones set to dark mode would
+            otherwise get light text on light cards. */}
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="light"
+          forcedTheme="light"
+          enableSystem={false}
+          nonce={nonce}
+        >
           {/* App-wide context providers (auth, cart, …) — edit providers.tsx, not this file. */}
           <AppProviders>
             {/* Public navigation from src/lib/nav.ts. SiteNav/SiteFooter yield

@@ -1,5 +1,6 @@
 /* Kithwheel brand theme. */
 :root {
+  color-scheme: light;
   --brand-h: 147;
   --brand-c: 0.07;
   --brand-l: 0.42;

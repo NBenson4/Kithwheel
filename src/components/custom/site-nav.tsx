@@ -6,7 +6,6 @@ import { ChevronDown, Menu } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import * as React from 'react';
-import { ThemeToggle } from '@/components/custom/theme-toggle';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -265,9 +264,6 @@ export function SiteNav() {
               </Button>
             ))}
           </div>
-
-          {/* Always visible */}
-          <ThemeToggle />
 
           {/* Mobile (below md): burger + drawer — only when there's something to collapse */}
           {collapsedCount > 0 && (
