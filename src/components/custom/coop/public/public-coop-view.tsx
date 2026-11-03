@@ -17,7 +17,6 @@ import { apiFetch } from '@/lib/api-client';
 import {
   PublicCoop,
   type PublicCoop as PublicCoopType,
-  type PublicSchedule,
   RegistrationResult,
 } from '@/lib/contracts/coop-features';
 import { formatMoney } from '@/lib/coop/money';

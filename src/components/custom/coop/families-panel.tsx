@@ -638,11 +638,11 @@ function FamilyDetails({
               )}
 
               {child.clashes.length > 0 && (
-                <p className={styles.note} role="status">
+                <output className={styles.note} style={{ display: 'block' }}>
                   Time clash:{' '}
                   {child.clashes.map(([first, second]) => `${first} and ${second}`).join('; ')}.
                   Skip one of them if {child.name} is taking the other instead.
-                </p>
+                </output>
               )}
 
               {otherSections.length > 0 && (
