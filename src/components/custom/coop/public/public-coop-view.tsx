@@ -1,4 +1,4 @@
-// The co-op's family link: published schedule, print, calendar, and registration.
+// The co-op's family link: approved section schedules, print, calendar, and registration.
 'use client';
 
 import { Plus } from 'lucide-react';
@@ -22,28 +22,12 @@ import {
 } from '@/lib/contracts/coop-features';
 import { formatMoney } from '@/lib/coop/money';
 
-type ChildDraft = { name: string; ageGroup: string; classIds: string[] };
-const emptyChild = (): ChildDraft => ({ name: '', ageGroup: '', classIds: [] });
+type ChildDraft = { name: string; grade: string };
+const emptyChild = (): ChildDraft => ({ name: '', grade: '' });
 
-type Done = { kind: 'registered' | 'already'; enrolled: string[]; waitlisted: string[] };
+type Done = { kind: 'registered' | 'already' };
 
-function classesFor(schedule: PublicSchedule, ageGroup: string) {
-  const rotation = schedule.rotations.find((item) => item.ageGroup === ageGroup);
-  if (rotation) return rotation.classes;
-  const seen = new Map<string, PublicSchedule['rotations'][number]['classes'][number]>();
-  for (const item of schedule.rotations.flatMap((entry) => entry.classes)) seen.set(item.id, item);
-  return [...seen.values()];
-}
-
-function RegistrationForm({
-  token,
-  coop,
-  schedule,
-}: {
-  token: string;
-  coop: PublicCoopType;
-  schedule: PublicSchedule;
-}) {
+function RegistrationForm({ token, coop }: { token: string; coop: PublicCoopType }) {
   const [parentName, setParentName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
@@ -52,8 +36,6 @@ function RegistrationForm({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<Done | null>(null);
-  const ageGroups = schedule.rotations.map((rotation) => rotation.ageGroup);
-  const singleGroup = ageGroups.length === 1;
 
   function updateChild(index: number, next: ChildDraft) {
     setChildren(children.map((child, i) => (i === index ? next : child)));
@@ -70,18 +52,11 @@ function RegistrationForm({
           email,
           phone,
           website,
-          children: children.map((child) => ({
-            name: child.name,
-            ageGroup: child.ageGroup || (singleGroup ? ageGroups[0] : ''),
-          })),
+          children: children.map((child) => ({ name: child.name, grade: child.grade })),
         }),
         schema: RegistrationResult,
       });
-      setDone({
-        kind: result.status === 'registered' ? 'registered' : 'already',
-        enrolled: result.enrolled.map((item) => `${item.childName}: ${item.className}`),
-        waitlisted: result.waitlisted.map((item) => `${item.childName}: ${item.className}`),
-      });
+      setDone({ kind: result.status === 'registered' ? 'registered' : 'already' });
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err) {
       setError(errorMessage(err));
@@ -98,31 +73,9 @@ function RegistrationForm({
         </h2>
         {done.kind === 'registered' ? (
           <>
-            {done.enrolled.length > 0 && (
-              <div>
-                <p className={base.fieldLabel}>Classes</p>
-                <ul>
-                  {done.enrolled.map((line) => (
-                    <li key={line}>{line}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-            {done.waitlisted.length > 0 && (
-              <div>
-                <p className={base.fieldLabel}>On the waitlist (we’ll email you if a seat opens)</p>
-                <ul>
-                  {done.waitlisted.map((line) => (
-                    <li key={line}>{line}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-            {!done.enrolled.length && !done.waitlisted.length && (
-              <p className={base.description}>
-                Your coordinators will place your children in classes and let you know.
-              </p>
-            )}
+            <p className={base.description}>
+              Your coordinators will place each child in their grade’s classes and let you know.
+            </p>
             <p className={base.description}>
               We emailed {email} a private link to your family page, with your classes, materials,
               fees and volunteer hours. If it doesn’t arrive in a few minutes, check spam.
@@ -210,72 +163,58 @@ function RegistrationForm({
           </label>
         </div>
 
-        {children.map((child, index) => {
-          const group = child.ageGroup || (singleGroup ? (ageGroups[0] ?? '') : '');
-          const options = group ? classesFor(schedule, group) : [];
-          return (
-            // biome-ignore lint/suspicious/noArrayIndexKey: children are edited in place by position.
-            <fieldset className={styles.childCard} key={index} style={{ margin: 0 }}>
-              <legend className={styles.rowTitle} style={{ padding: '0 4px' }}>
-                Child {index + 1}
-              </legend>
-              <div className={base.optionalGrid}>
-                <label className={base.smallLabel} htmlFor={`reg-child-${index}`}>
-                  Name
-                  <input
-                    id={`reg-child-${index}`}
-                    className={base.field}
-                    value={child.name}
-                    required
-                    maxLength={120}
-                    onChange={(event) => updateChild(index, { ...child, name: event.target.value })}
-                  />
-                </label>
-                {!singleGroup && (
-                  <label className={base.smallLabel} htmlFor={`reg-group-${index}`}>
-                    Age group
-                    <select
-                      id={`reg-group-${index}`}
-                      className={base.select}
-                      value={child.ageGroup}
-                      required
-                      onChange={(event) =>
-                        updateChild(index, { ...child, ageGroup: event.target.value })
-                      }
-                    >
-                      <option value="">Choose…</option>
-                      {ageGroups.map((ageGroup) => (
-                        <option key={ageGroup} value={ageGroup}>
-                          {ageGroup}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                )}
+        {children.map((child, index) => (
+          // biome-ignore lint/suspicious/noArrayIndexKey: children are edited in place by position.
+          <fieldset className={styles.childCard} key={index} style={{ margin: 0 }}>
+            <legend className={styles.rowTitle} style={{ padding: '0 4px' }}>
+              Child {index + 1}
+            </legend>
+            <div className={base.optionalGrid}>
+              <label className={base.smallLabel} htmlFor={`reg-child-${index}`}>
+                Name
+                <input
+                  id={`reg-child-${index}`}
+                  className={base.field}
+                  value={child.name}
+                  required
+                  maxLength={120}
+                  onChange={(event) => updateChild(index, { ...child, name: event.target.value })}
+                />
+              </label>
+              <label className={base.smallLabel} htmlFor={`reg-grade-${index}`}>
+                Grade
+                <select
+                  id={`reg-grade-${index}`}
+                  className={base.select}
+                  value={child.grade}
+                  required
+                  onChange={(event) => updateChild(index, { ...child, grade: event.target.value })}
+                >
+                  <option value="">Choose…</option>
+                  {coop.grades.map((grade) => (
+                    <option key={grade} value={grade}>
+                      {grade}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            {children.length > 1 && (
+              <div className={base.buttonRow}>
+                <button
+                  className={styles.chipButton}
+                  type="button"
+                  onClick={() => setChildren(children.filter((_, i) => i !== index))}
+                >
+                  Remove this child
+                </button>
               </div>
-              {options.length > 0 ? (
-                <p className={base.muted} style={{ margin: 0 }}>
-                  {group} classes: {options.map((item) => item.name).join(', ')}
-                </p>
-              ) : (
-                <p className={base.muted} style={{ margin: 0 }}>
-                  Choose an age group. Your coordinators place each child in classes.
-                </p>
-              )}
-              {children.length > 1 && (
-                <div className={base.buttonRow}>
-                  <button
-                    className={styles.chipButton}
-                    type="button"
-                    onClick={() => setChildren(children.filter((_, i) => i !== index))}
-                  >
-                    Remove this child
-                  </button>
-                </div>
-              )}
-            </fieldset>
-          );
-        })}
+            )}
+          </fieldset>
+        ))}
+        <p className={base.muted} style={{ margin: 0 }}>
+          Your coordinators place each child in their grade’s section and classes.
+        </p>
         <div className={base.buttonRow}>
           <button
             className={base.quietButton}
@@ -347,11 +286,8 @@ export function PublicCoopView({ token }: { token: string }) {
 
   return (
     <main className={styles.publicPage}>
-      <PublicHeader
-        eyebrow={coop.schedule ? coop.schedule.title : 'Co-op schedule'}
-        title={coop.name}
-      >
-        {coop.schedule && <PrintButton />}
+      <PublicHeader eyebrow="Co-op schedules" title={coop.name}>
+        {coop.schedule.sections.length > 0 && <PrintButton />}
         {coop.registration.open && (
           <a className={base.button} href="#register-heading">
             Register
@@ -362,23 +298,13 @@ export function PublicCoopView({ token }: { token: string }) {
         <p className={base.muted}>Co-op meets on {WEEKDAYS[coop.meetingDay]}s.</p>
       )}
       {coop.calendarUrl && <CalendarLinks url={coop.calendarUrl} />}
-      {coop.schedule ? (
-        <section className={styles.section} aria-labelledby="schedule-heading">
-          <h2 className={styles.sectionTitle} id="schedule-heading">
-            Class schedule
-          </h2>
-          <ScheduleView schedule={coop.schedule} />
-        </section>
-      ) : (
-        <section className={styles.section}>
-          <p className={base.description}>
-            The schedule hasn’t been published yet. Check back soon.
-          </p>
-        </section>
-      )}
-      {coop.registration.open && coop.schedule && (
-        <RegistrationForm token={token} coop={coop} schedule={coop.schedule} />
-      )}
+      <section className={styles.section} aria-labelledby="schedule-heading">
+        <h2 className={styles.sectionTitle} id="schedule-heading">
+          Schedules by grade
+        </h2>
+        <ScheduleView schedule={coop.schedule} />
+      </section>
+      {coop.registration.open && <RegistrationForm token={token} coop={coop} />}
       <p className={`${styles.footerNote} ${styles.noPrint}`}>
         Shared with Kithwheel, the co-op organizer.
       </p>

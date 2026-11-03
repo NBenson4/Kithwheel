@@ -1,11 +1,12 @@
-// Families tab: registration, class placement, and each family's details.
+// Families tab: registration, section placement, and each family's details (including
+// each child's schedule and case-by-case class changes).
 'use client';
 
 import { Download, Mail, Plus, Trash2, UserPlus } from 'lucide-react';
 import { type FormEvent, useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import styles from '@/components/custom/coop/coop.module.css';
-import { PlacementPanel, type RotationSummary } from '@/components/custom/coop/placement-panel';
+import { PlacementPanel } from '@/components/custom/coop/placement-panel';
 import { FamilyLinkCard } from '@/components/custom/coop/settings-panel';
 import { copyText, downloadCsv, errorMessage, post } from '@/components/custom/coop/shared';
 import base from '@/components/custom/scheduling/scheduling.module.css';
@@ -16,6 +17,7 @@ import {
   FamilyOverview,
   type FamilyOverview as FamilyOverviewType,
   type FamilyRecord,
+  type SectionSummary,
 } from '@/lib/contracts/coop-features';
 
 type Props = {
@@ -24,10 +26,14 @@ type Props = {
   onSettings: (settings: CoopSettingsType) => void;
 };
 
-type PanelProps = Props & { rotations: RotationSummary[] };
+type ChildDraft = { name: string; sectionId: string };
+const emptyChild = (): ChildDraft => ({ name: '', sectionId: '' });
+const toChildInput = (child: ChildDraft) => ({
+  name: child.name,
+  sectionId: child.sectionId || null,
+});
 
-type ChildDraft = { name: string; ageGroup: string; classIds: string[] };
-const emptyChild = (): ChildDraft => ({ name: '', ageGroup: '', classIds: [] });
+type SectionOption = { id: string; name: string };
 
 function RegistrationCard({ coopId, settings, onSettings }: Props) {
   const [note, setNote] = useState(settings.registrationNote ?? '');
@@ -106,20 +112,21 @@ function RegistrationCard({ coopId, settings, onSettings }: Props) {
   );
 }
 
-export function AgeGroupSelect({
+export function SectionSelect({
   id,
   value,
-  ageGroups,
+  sections,
   onChange,
-  label = 'Age group',
+  label = 'Section',
+  emptyLabel = 'Not placed yet',
 }: {
   id: string;
   value: string;
-  ageGroups: string[];
+  sections: SectionOption[];
   onChange: (value: string) => void;
   label?: string;
+  emptyLabel?: string;
 }) {
-  const options = value && !ageGroups.includes(value) ? [...ageGroups, value] : ageGroups;
   return (
     <label className={base.smallLabel} htmlFor={id}>
       {label}
@@ -129,10 +136,10 @@ export function AgeGroupSelect({
         value={value}
         onChange={(event) => onChange(event.target.value)}
       >
-        <option value="">No age group</option>
-        {options.map((group) => (
-          <option key={group} value={group}>
-            {group}
+        <option value="">{emptyLabel}</option>
+        {sections.map((section) => (
+          <option key={section.id} value={section.id}>
+            {section.name}
           </option>
         ))}
       </select>
@@ -143,13 +150,13 @@ export function AgeGroupSelect({
 function ChildFields({
   child,
   index,
-  ageGroups,
+  sections,
   onChange,
   onRemove,
 }: {
   child: ChildDraft;
   index: number;
-  ageGroups: string[];
+  sections: SectionOption[];
   onChange: (child: ChildDraft) => void;
   onRemove?: () => void;
 }) {
@@ -167,11 +174,11 @@ function ChildFields({
             onChange={(event) => onChange({ ...child, name: event.target.value })}
           />
         </label>
-        <AgeGroupSelect
-          id={`child-age-${index}`}
-          value={child.ageGroup}
-          ageGroups={ageGroups}
-          onChange={(ageGroup) => onChange({ ...child, ageGroup })}
+        <SectionSelect
+          id={`child-section-${index}`}
+          value={child.sectionId}
+          sections={sections}
+          onChange={(sectionId) => onChange({ ...child, sectionId })}
         />
       </div>
       {onRemove && (
@@ -187,11 +194,11 @@ function ChildFields({
 
 function AddFamilyForm({
   coopId,
-  ageGroups,
+  sections,
   onDone,
 }: {
   coopId: string;
-  ageGroups: string[];
+  sections: SectionOption[];
   onDone: (overview: FamilyOverviewType) => void;
 }) {
   const [parentName, setParentName] = useState('');
@@ -206,7 +213,7 @@ function AddFamilyForm({
     setSaving(true);
     try {
       const overview = await apiFetch(`/api/coops/${coopId}/families`, {
-        ...post({ parentName, email, phone, children, sendEmail }),
+        ...post({ parentName, email, phone, children: children.map(toChildInput), sendEmail }),
         schema: FamilyOverview,
       });
       toast.success(`${parentName} added${sendEmail ? ' and emailed their family link' : ''}`);
@@ -261,7 +268,7 @@ function AddFamilyForm({
           key={index}
           child={child}
           index={index}
-          ageGroups={ageGroups}
+          sections={sections}
           onChange={(next) => setChildren(children.map((item, i) => (i === index ? next : item)))}
           onRemove={
             children.length > 1
@@ -300,14 +307,12 @@ function AddFamilyForm({
 function FamilyDetails({
   coopId,
   family,
-  classes,
-  ageGroups,
+  sections,
   onOverview,
 }: {
   coopId: string;
   family: FamilyRecord;
-  classes: { id: string; name: string }[];
-  ageGroups: string[];
+  sections: SectionSummary[];
   onOverview: (overview: FamilyOverviewType) => void;
 }) {
   const [editing, setEditing] = useState(false);
@@ -348,7 +353,7 @@ function FamilyDetails({
   }
 
   const childCount = family.children.length;
-  const unplaced = family.children.filter((child) => !child.enrollments.length).length;
+  const unplaced = family.children.filter((child) => !child.sectionId).length;
   return (
     <details className={styles.details}>
       <summary>
@@ -460,24 +465,33 @@ function FamilyDetails({
         )}
 
         {family.children.map((child) => {
-          const taken = new Set(child.enrollments.map((entry) => entry.classId));
-          const options = classes.filter((item) => !taken.has(item.id));
+          const ownSection = sections.find((section) => section.id === child.sectionId);
+          const taking = new Set(child.classes.map((item) => item.classId));
+          const skipped = new Set(child.skipped.map((item) => item.classId));
+          const otherSections = sections.filter(
+            (section) => section.id !== child.sectionId && section.classes.length,
+          );
           return (
             <div className={styles.childCard} key={child.id}>
               <div className={styles.row} style={{ padding: 0, border: 0, background: 'none' }}>
-                <span className={styles.rowTitle}>{child.name}</span>
+                <span className={styles.rowMain}>
+                  <span className={styles.rowTitle}>{child.name}</span>
+                  {!child.sectionId && child.requestedSection && (
+                    <span className={styles.rowMeta}>Signed up for {child.requestedSection}</span>
+                  )}
+                </span>
                 <span className={styles.rowActions} style={{ alignItems: 'flex-end' }}>
-                  <AgeGroupSelect
-                    id={`age-${child.id}`}
-                    value={child.ageGroup ?? ''}
-                    ageGroups={ageGroups}
-                    onChange={(ageGroup) =>
+                  <SectionSelect
+                    id={`section-${child.id}`}
+                    value={child.sectionId ?? ''}
+                    sections={sections}
+                    onChange={(sectionId) =>
                       void run(
                         `/api/coops/${coopId}/children/${child.id}`,
-                        post({ ageGroup: ageGroup || null }, 'PATCH'),
-                        ageGroup
-                          ? `${child.name} is now in ${ageGroup}`
-                          : `${child.name}’s age group cleared`,
+                        post({ sectionId: sectionId || null }, 'PATCH'),
+                        sectionId
+                          ? `${child.name} is now in ${sections.find((section) => section.id === sectionId)?.name}`
+                          : `${child.name} is no longer in a section`,
                       )
                     }
                   />
@@ -516,69 +530,143 @@ function FamilyDetails({
                   )}
                 </span>
               </div>
-              {child.enrollments.length ? (
-                <ul className={styles.list}>
-                  {child.enrollments.map((entry) => (
-                    <li className={styles.row} key={entry.id}>
-                      <span className={styles.rowTitle}>{entry.className}</span>
-                      <span className={styles.rowActions}>
-                        <span
-                          className={`${styles.pill} ${entry.status === 'enrolled' ? styles.pillGood : styles.pillWarn}`}
-                        >
-                          {entry.status === 'enrolled' ? 'Enrolled' : 'Waitlist'}
-                        </span>
-                        {entry.status === 'waitlisted' && (
+
+              {ownSection ? (
+                <>
+                  <span className={styles.groupTitle}>{ownSection.name} schedule</span>
+                  {ownSection.classes.length ? (
+                    <ul className={styles.list}>
+                      {ownSection.classes.map((item) => {
+                        const isSkipped = skipped.has(item.id);
+                        return (
+                          <li className={styles.row} key={item.id}>
+                            <span className={styles.rowMain}>
+                              <span
+                                className={styles.rowTitle}
+                                style={
+                                  isSkipped
+                                    ? { textDecoration: 'line-through', opacity: 0.6 }
+                                    : undefined
+                                }
+                              >
+                                {item.name}
+                              </span>
+                              <span className={styles.rowMeta}>
+                                {item.time ?? 'No time set'}
+                                {isSkipped ? ' · skipped for this child' : ''}
+                              </span>
+                            </span>
+                            <span className={styles.rowActions}>
+                              {isSkipped ? (
+                                <button
+                                  className={styles.chipButton}
+                                  type="button"
+                                  disabled={busy}
+                                  onClick={() =>
+                                    void run(
+                                      `/api/coops/${coopId}/children/${child.id}/exceptions/${item.id}`,
+                                      post({}, 'DELETE'),
+                                      `${child.name} is back in ${item.name}`,
+                                    )
+                                  }
+                                >
+                                  Put back
+                                </button>
+                              ) : (
+                                <button
+                                  className={styles.chipButton}
+                                  type="button"
+                                  disabled={busy}
+                                  onClick={() =>
+                                    void run(
+                                      `/api/coops/${coopId}/children/${child.id}/exceptions`,
+                                      post({ classId: item.id, kind: 'skip' }),
+                                      `${child.name} will skip ${item.name}`,
+                                    )
+                                  }
+                                >
+                                  Skip this class
+                                </button>
+                              )}
+                            </span>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  ) : (
+                    <p className={base.muted}>{ownSection.name} has no classes yet.</p>
+                  )}
+                </>
+              ) : (
+                <p className={styles.note}>
+                  Not placed yet. Choose a section above, or use Section placement.
+                </p>
+              )}
+
+              {child.classes.some((item) => item.source === 'added') && (
+                <>
+                  <span className={styles.groupTitle}>From other sections</span>
+                  <ul className={styles.list}>
+                    {child.classes
+                      .filter((item) => item.source === 'added')
+                      .map((item) => (
+                        <li className={styles.row} key={item.classId}>
+                          <span className={styles.rowMain}>
+                            <span className={styles.rowTitle}>{item.className}</span>
+                            <span className={styles.rowMeta}>
+                              {item.sectionName} · {item.time ?? 'No time set'}
+                            </span>
+                          </span>
                           <button
                             className={styles.chipButton}
                             type="button"
                             disabled={busy}
                             onClick={() =>
                               void run(
-                                `/api/coops/${coopId}/enrollments/${entry.id}`,
-                                post({ status: 'enrolled' }, 'PATCH'),
-                                `${child.name} enrolled in ${entry.className}`,
+                                `/api/coops/${coopId}/children/${child.id}/exceptions/${item.classId}`,
+                                post({}, 'DELETE'),
+                                `${child.name} dropped ${item.className}`,
                               )
                             }
                           >
-                            Enroll anyway
+                            Remove
                           </button>
-                        )}
-                        <button
-                          className={styles.chipButton}
-                          type="button"
-                          disabled={busy}
-                          onClick={() =>
-                            void run(
-                              `/api/coops/${coopId}/enrollments/${entry.id}`,
-                              post({}, 'DELETE'),
-                              `${child.name} removed from ${entry.className}`,
-                            )
-                          }
-                        >
-                          Remove
-                        </button>
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className={base.muted}>No classes yet.</p>
+                        </li>
+                      ))}
+                  </ul>
+                </>
               )}
-              {options.length > 0 && (
+
+              {child.clashes.length > 0 && (
+                <p className={styles.note} role="status">
+                  Time clash:{' '}
+                  {child.clashes.map(([first, second]) => `${first} and ${second}`).join('; ')}.
+                  Skip one of them if {child.name} is taking the other instead.
+                </p>
+              )}
+
+              {otherSections.length > 0 && (
                 <div className={base.buttonRow}>
                   <select
                     className={base.select}
-                    aria-label={`Add a class for ${child.name}`}
+                    aria-label={`Add a class from another section for ${child.name}`}
                     value={pickClass[child.id] ?? ''}
                     onChange={(event) =>
                       setPickClass({ ...pickClass, [child.id]: event.target.value })
                     }
                   >
-                    <option value="">Add a class…</option>
-                    {options.map((item) => (
-                      <option key={item.id} value={item.id}>
-                        {item.name}
-                      </option>
+                    <option value="">Add a class from another section…</option>
+                    {otherSections.map((section) => (
+                      <optgroup key={section.id} label={section.name}>
+                        {section.classes
+                          .filter((item) => !taking.has(item.id))
+                          .map((item) => (
+                            <option key={item.id} value={item.id}>
+                              {item.name}
+                              {item.time ? ` (${item.time})` : ''}
+                            </option>
+                          ))}
+                      </optgroup>
                     ))}
                   </select>
                   <button
@@ -587,9 +675,9 @@ function FamilyDetails({
                     disabled={busy || !pickClass[child.id]}
                     onClick={async () => {
                       const ok = await run(
-                        `/api/coops/${coopId}/enrollments`,
-                        post({ childId: child.id, classId: pickClass[child.id] }),
-                        'Class added',
+                        `/api/coops/${coopId}/children/${child.id}/exceptions`,
+                        post({ classId: pickClass[child.id], kind: 'add' }),
+                        'Class added for this child',
                       );
                       if (ok) setPickClass({ ...pickClass, [child.id]: '' });
                     }}
@@ -609,7 +697,7 @@ function FamilyDetails({
               event.preventDefault();
               const ok = await run(
                 `/api/coops/${coopId}/families/${family.id}/children`,
-                post(newChild),
+                post(toChildInput(newChild)),
                 `${newChild.name} added`,
               );
               if (ok) {
@@ -618,7 +706,7 @@ function FamilyDetails({
               }
             }}
           >
-            <ChildFields child={newChild} index={99} ageGroups={ageGroups} onChange={setNewChild} />
+            <ChildFields child={newChild} index={99} sections={sections} onChange={setNewChild} />
             <div className={base.buttonRow}>
               <button className={base.button} type="submit" disabled={busy}>
                 Add child
@@ -644,7 +732,7 @@ function FamilyDetails({
           <div className={base.confirmBox} role="alert">
             <p className={base.confirmText}>
               Remove {family.parentName}’s family? Their children, classes, payments and volunteer
-              hours are deleted, and their seats go to the waitlist. This can’t be undone.
+              hours are deleted. This can’t be undone.
             </p>
             <div className={base.buttonRow}>
               <button
@@ -718,19 +806,28 @@ export function LoadState({ error, onRetry }: { error: boolean; onRetry: () => v
   );
 }
 
-export function FamiliesPanel({ coopId, settings, onSettings, rotations }: PanelProps) {
+export function FamiliesPanel({ coopId, settings, onSettings }: Props) {
   const { overview, setOverview, error, reload } = useFamilyOverview(coopId);
   const [adding, setAdding] = useState(false);
   const [query, setQuery] = useState('');
 
   if (!overview) return <LoadState error={error} onRetry={() => void reload()} />;
 
-  const classes = overview.classes.map((item) => ({ id: item.id, name: item.name }));
-  const ageGroups = [...new Set(rotations.map((rotation) => rotation.ageGroup))];
+  const sectionOptions = overview.sections.map((section) => ({
+    id: section.id,
+    name: section.name,
+  }));
   const childCount = overview.families.reduce((sum, family) => sum + family.children.length, 0);
-  const waiting = overview.classes.reduce((sum, item) => sum + item.waitlisted, 0);
   const unplacedCount = overview.families.reduce(
-    (sum, family) => sum + family.children.filter((child) => !child.enrollments.length).length,
+    (sum, family) => sum + family.children.filter((child) => !child.sectionId).length,
+    0,
+  );
+  const changedCount = overview.families.reduce(
+    (sum, family) =>
+      sum +
+      family.children.filter(
+        (child) => child.skipped.length || child.classes.some((item) => item.source === 'added'),
+      ).length,
     0,
   );
   const search = query.trim().toLowerCase();
@@ -746,30 +843,26 @@ export function FamiliesPanel({ coopId, settings, onSettings, rotations }: Panel
   function exportRoster() {
     if (!overview) return;
     const rows: (string | number | null)[][] = [
-      ['Parent', 'Email', 'Phone', 'Child', 'Age group', 'Class', 'Status'],
+      ['Parent', 'Email', 'Phone', 'Child', 'Section', 'Class', 'Time', 'Note'],
     ];
     for (const family of overview.families) {
       for (const child of family.children) {
-        if (!child.enrollments.length) {
-          rows.push([
-            family.parentName,
-            family.email,
-            family.phone,
-            child.name,
-            child.ageGroup,
-            '',
-            '',
-          ]);
+        const first = [
+          family.parentName,
+          family.email,
+          family.phone,
+          child.name,
+          child.sectionName,
+        ];
+        if (!child.classes.length) {
+          rows.push([...first, '', '', child.sectionId ? '' : 'Not placed yet']);
         }
-        for (const entry of child.enrollments) {
+        for (const item of child.classes) {
           rows.push([
-            family.parentName,
-            family.email,
-            family.phone,
-            child.name,
-            child.ageGroup,
-            entry.className,
-            entry.status === 'enrolled' ? 'Enrolled' : 'Waitlist',
+            ...first,
+            item.className,
+            item.time,
+            item.source === 'added' ? `From ${item.sectionName}` : '',
           ]);
         }
       }
@@ -786,16 +879,17 @@ export function FamiliesPanel({ coopId, settings, onSettings, rotations }: Panel
         <ol className={styles.steps}>
           <li>
             <strong>Families sign up.</strong> Share your family link. While registration is open,
-            parents enter their name, email, and each child’s name and age group. You can also add a
+            parents enter their name, email, and each child’s name and grade. You can also add a
             family yourself.
           </li>
           <li>
-            <strong>Children are added to your co-op.</strong> Each child appears in the list below,
-            marked “Not placed yet.” Signing up never puts a child in a class.
+            <strong>You place each child in a grade section.</strong> In Section placement, pick a
+            section and select everyone who signed up for it, or tick children one by one. A child
+            in a section takes that section’s whole schedule.
           </li>
           <li>
-            <strong>You place them in classes.</strong> In Class placement, choose a class, then
-            select its whole age group or tick individual children.
+            <strong>Make exceptions one class at a time.</strong> Open a family below to have a
+            child skip one of their section’s classes, or take a single class from another section.
           </li>
         </ol>
       </section>
@@ -814,8 +908,8 @@ export function FamiliesPanel({ coopId, settings, onSettings, rotations }: Panel
           <span className={styles.statLabel}>Children</span>
         </div>
         <div className={styles.stat}>
-          <span className={styles.statValue}>{waiting}</span>
-          <span className={styles.statLabel}>On waitlists</span>
+          <span className={styles.statValue}>{changedCount}</span>
+          <span className={styles.statLabel}>With class changes</span>
         </div>
       </div>
 
@@ -834,7 +928,6 @@ export function FamiliesPanel({ coopId, settings, onSettings, rotations }: Panel
         overview={overview}
         onOverview={setOverview}
         reload={reload}
-        rotations={rotations}
       />
 
       <section className={base.panel} aria-labelledby="families-heading">
@@ -864,7 +957,7 @@ export function FamiliesPanel({ coopId, settings, onSettings, rotations }: Panel
           {adding && (
             <AddFamilyForm
               coopId={coopId}
-              ageGroups={ageGroups}
+              sections={sectionOptions}
               onDone={(next) => {
                 setOverview(next);
                 setAdding(false);
@@ -887,8 +980,7 @@ export function FamiliesPanel({ coopId, settings, onSettings, rotations }: Panel
                 key={family.id}
                 coopId={coopId}
                 family={family}
-                classes={classes}
-                ageGroups={ageGroups}
+                sections={overview.sections}
                 onOverview={setOverview}
               />
             ))

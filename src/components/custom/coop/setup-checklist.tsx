@@ -19,13 +19,12 @@ export type WorkspaceTab =
 type Props = {
   coopId: string;
   settings: CoopSettings;
-  scheduleCount: number;
   onGo: (tab: WorkspaceTab) => void;
 };
 
 const storageKey = (coopId: string) => `kithwheel:checklist-hidden:${coopId}`;
 
-export function SetupChecklist({ coopId, settings, scheduleCount, onGo }: Props) {
+export function SetupChecklist({ coopId, settings, onGo }: Props) {
   const [hidden, setHidden] = useState(true);
 
   useEffect(() => {
@@ -37,10 +36,16 @@ export function SetupChecklist({ coopId, settings, scheduleCount, onGo }: Props)
   }, [coopId]);
 
   const items: { label: string; done: boolean; tab: WorkspaceTab }[] = [
-    { label: 'Add your classes', done: settings.counts.classes > 0, tab: 'schedule' },
     {
-      label: 'Build and publish a schedule',
-      done: settings.hasCurrentSchedule,
+      label: 'Add classes to your grade sections',
+      done: settings.counts.classes > 0,
+      tab: 'schedule',
+    },
+    {
+      label: 'Approve each section’s schedule',
+      done:
+        settings.sectionsWithClasses > 0 &&
+        settings.sectionsApproved === settings.sectionsWithClasses,
       tab: 'schedule',
     },
     { label: 'Create the family link', done: settings.shareUrl !== null, tab: 'settings' },
@@ -79,7 +84,7 @@ export function SetupChecklist({ coopId, settings, scheduleCount, onGo }: Props)
           </h2>
           <p className={base.muted} style={{ margin: '4px 0 0' }}>
             {doneCount} of {items.length} done
-            {scheduleCount === 0 ? ' · start with your classes' : ''}
+            {settings.counts.classes === 0 ? ' · start with your classes' : ''}
           </p>
         </div>
         <button

@@ -1,5 +1,6 @@
-// Class placement: choose a class on the left; a sidebar lists children with "Select all"
-// for the class's age group and checkboxes for exceptions (a child who tested up a level).
+// Section placement: choose a grade section; a sidebar lists children with "Select all who
+// signed up for this grade", children not placed yet, and children from other sections.
+// A child in a section takes that section's whole schedule.
 'use client';
 
 import { Search, Users, Wand2 } from 'lucide-react';
@@ -10,35 +11,32 @@ import { errorMessage, post } from '@/components/custom/coop/shared';
 import base from '@/components/custom/scheduling/scheduling.module.css';
 import { apiFetch } from '@/lib/api-client';
 import {
-  AutoPlaceResult,
+  AssignResult,
   FamilyOverview,
   type FamilyOverview as FamilyOverviewType,
 } from '@/lib/contracts/coop-features';
-
-export type RotationSummary = { ageGroup: string; classes: { id: string; name: string }[] };
 
 type Props = {
   coopId: string;
   overview: FamilyOverviewType;
   onOverview: (overview: FamilyOverviewType) => void;
   reload: () => Promise<void>;
-  rotations: RotationSummary[];
 };
 
 type ChildRow = {
   id: string;
   name: string;
-  ageGroup: string | null;
-  placed: boolean;
   familyName: string;
+  sectionId: string | null;
+  sectionName: string | null;
+  requestedSection: string | null;
+  changes: number;
 };
 
 const key = (value: string | null | undefined) => (value ?? '').trim().toLowerCase();
 
-export function PlacementPanel({ coopId, overview, onOverview, reload, rotations }: Props) {
-  const [classId, setClassId] = useState<string | null>(
-    rotations[0]?.classes[0]?.id ?? overview.classes[0]?.id ?? null,
-  );
+export function PlacementPanel({ coopId, overview, onOverview, reload }: Props) {
+  const [sectionId, setSectionId] = useState<string | null>(overview.sections[0]?.id ?? null);
   const [draft, setDraft] = useState<Set<string> | null>(null);
   const [query, setQuery] = useState('');
   const [saving, setSaving] = useState(false);
@@ -50,49 +48,47 @@ export function PlacementPanel({ coopId, overview, onOverview, reload, rotations
         family.children.map((child) => ({
           id: child.id,
           name: child.name,
-          ageGroup: child.ageGroup,
           familyName: family.parentName,
-          placed: child.enrollments.length > 0,
+          sectionId: child.sectionId,
+          sectionName: child.sectionName,
+          requestedSection: child.requestedSection,
+          changes:
+            child.skipped.length + child.classes.filter((item) => item.source === 'added').length,
         })),
       ),
     [overview],
   );
-  const roster = overview.classes.find((item) => item.id === classId) ?? null;
-  const statusByChild = useMemo(() => {
-    const map = new Map<string, 'enrolled' | 'waitlisted'>();
-    for (const family of overview.families) {
-      for (const child of family.children) {
-        const entry = child.enrollments.find((item) => item.classId === classId);
-        if (entry) map.set(child.id, entry.status);
-      }
-    }
-    return map;
-  }, [overview, classId]);
+  const section = overview.sections.find((item) => item.id === sectionId) ?? null;
   const saved = useMemo(
     () =>
-      new Set([...statusByChild].filter(([, status]) => status === 'enrolled').map(([id]) => id)),
-    [statusByChild],
+      new Set(children.filter((child) => child.sectionId === sectionId).map((child) => child.id)),
+    [children, sectionId],
   );
   const selected = draft ?? saved;
   const changes =
     [...selected].filter((id) => !saved.has(id)).length +
     [...saved].filter((id) => !selected.has(id)).length;
 
-  // The age groups whose rotation includes this class.
-  const classGroups = rotations
-    .filter((rotation) => rotation.classes.some((item) => item.id === classId))
-    .map((rotation) => rotation.ageGroup);
-  const groupKeys = new Set(classGroups.map(key));
   const search = query.trim().toLowerCase();
   const matches = (child: ChildRow) =>
     !search || `${child.name} ${child.familyName}`.toLowerCase().includes(search);
-  const inGroup = children.filter((child) => groupKeys.has(key(child.ageGroup)) && matches(child));
-  const others = children.filter((child) => !groupKeys.has(key(child.ageGroup)) && matches(child));
-  const otherSelected = others.filter((child) => selected.has(child.id)).length;
+  const members = children.filter((child) => saved.has(child.id) && matches(child));
+  const unplaced = children.filter((child) => !child.sectionId && matches(child));
+  const elsewhere = children.filter(
+    (child) => child.sectionId && child.sectionId !== sectionId && matches(child),
+  );
+  const askedForThis = section
+    ? children.filter(
+        (child) => !child.sectionId && key(child.requestedSection) === key(section.name),
+      )
+    : [];
+  const allAsked = askedForThis.length > 0 && askedForThis.every((child) => selected.has(child.id));
+  const unplacedTotal = children.filter((child) => !child.sectionId).length;
+  const movedHere = elsewhere.filter((child) => selected.has(child.id)).length;
 
-  function chooseClass(id: string) {
-    if (changes && !window.confirm('Discard your unsaved changes to this class?')) return;
-    setClassId(id);
+  function choose(id: string) {
+    if (changes && !window.confirm('Discard your unsaved changes to this section?')) return;
+    setSectionId(id);
     setDraft(null);
     setQuery('');
   }
@@ -104,10 +100,9 @@ export function PlacementPanel({ coopId, overview, onOverview, reload, rotations
     setDraft(next);
   }
 
-  function selectGroup(ageGroup: string, on: boolean) {
+  function selectAsked(on: boolean) {
     const next = new Set(selected);
-    for (const child of children) {
-      if (key(child.ageGroup) !== key(ageGroup)) continue;
+    for (const child of askedForThis) {
       if (on) next.add(child.id);
       else next.delete(child.id);
     }
@@ -115,17 +110,17 @@ export function PlacementPanel({ coopId, overview, onOverview, reload, rotations
   }
 
   async function save() {
-    if (!classId) return;
+    if (!sectionId) return;
     setSaving(true);
     try {
       onOverview(
-        await apiFetch(`/api/coops/${coopId}/classes/${classId}/roster`, {
+        await apiFetch(`/api/coops/${coopId}/sections/${sectionId}/children`, {
           ...post({ childIds: [...selected] }, 'PUT'),
           schema: FamilyOverview,
         }),
       );
       setDraft(null);
-      toast.success(`${roster?.name ?? 'Class'} saved`);
+      toast.success(`${section?.name ?? 'Section'} saved`);
     } catch (error) {
       toast.error(errorMessage(error));
     } finally {
@@ -133,20 +128,20 @@ export function PlacementPanel({ coopId, overview, onOverview, reload, rotations
     }
   }
 
-  async function placeEveryone() {
+  async function placeRequested() {
     setSaving(true);
     try {
-      const result = await apiFetch(`/api/coops/${coopId}/placements/auto`, {
+      const result = await apiFetch(`/api/coops/${coopId}/placements/requested`, {
         ...post({}),
-        schema: AutoPlaceResult,
+        schema: AssignResult,
       });
       await reload();
       setDraft(null);
       setConfirmAuto(false);
       toast.success(
-        result.placed || result.waitlisted
-          ? `Placed ${result.placed}${result.waitlisted ? `, ${result.waitlisted} on waitlists` : ''}`
-          : 'Everyone is already in their age group’s classes',
+        result.assigned
+          ? `${result.assigned} ${result.assigned === 1 ? 'child' : 'children'} placed`
+          : 'No one was waiting with a grade that matches a section',
       );
     } catch (error) {
       toast.error(errorMessage(error));
@@ -155,14 +150,7 @@ export function PlacementPanel({ coopId, overview, onOverview, reload, rotations
     }
   }
 
-  const scheduled = new Set(
-    rotations.flatMap((rotation) => rotation.classes.map((item) => item.id)),
-  );
-  const unscheduled = overview.classes.filter((item) => !scheduled.has(item.id));
-  const overCapacity = roster?.capacity != null && selected.size > roster.capacity;
-
-  function childCheck(child: ChildRow, exception: boolean) {
-    const status = statusByChild.get(child.id);
+  function childCheck(child: ChildRow, note: string | null) {
     return (
       <label className={styles.placementChild} key={child.id}>
         <input
@@ -174,14 +162,13 @@ export function PlacementPanel({ coopId, overview, onOverview, reload, rotations
           <span className={styles.rowTitle}>{child.name}</span>
           <span className={styles.rowMeta}>
             {child.familyName}
-            {exception ? ` · ${child.ageGroup ?? 'No age group'}` : ''}
+            {note ? ` · ${note}` : ''}
           </span>
         </span>
-        {status === 'waitlisted' && !selected.has(child.id) && (
-          <span className={`${styles.pill} ${styles.pillWarn}`}>Waitlist</span>
-        )}
-        {!child.placed && !selected.has(child.id) && (
-          <span className={`${styles.pill} ${styles.pillWarn}`}>Not placed yet</span>
+        {child.changes > 0 && saved.has(child.id) && (
+          <span className={styles.pill}>
+            {child.changes} {child.changes === 1 ? 'change' : 'changes'}
+          </span>
         )}
       </label>
     );
@@ -192,36 +179,36 @@ export function PlacementPanel({ coopId, overview, onOverview, reload, rotations
       <div className={base.panelHeader}>
         <div>
           <h2 className={base.panelTitle} id="placement-heading">
-            Class placement
+            Section placement
           </h2>
           <p className={base.muted} style={{ margin: '4px 0 0' }}>
-            Coordinators decide where children go. Pick a class, then choose who’s in it.
+            Pick a section, then choose who’s in it. Children take their section’s whole schedule.
+            {unplacedTotal ? ` ${unplacedTotal} not placed yet.` : ''}
           </p>
         </div>
         <button
           className={base.quietButton}
           type="button"
-          disabled={saving || !rotations.length}
+          disabled={saving || !unplacedTotal}
           onClick={() => setConfirmAuto(true)}
         >
-          <Wand2 aria-hidden="true" size={15} /> Place everyone by age group
+          <Wand2 aria-hidden="true" size={15} /> Place everyone in the grade they chose
         </button>
       </div>
       {confirmAuto && (
         <div className={base.confirmBox} role="alert" style={{ marginBottom: 14 }}>
           <p className={base.confirmText}>
-            Every child goes into all the classes of their age group’s rotation. Children already in
-            a class stay where they are, and nobody is removed. Full classes put the extra children
-            on the waitlist.
+            Each child who isn’t placed yet goes into the section matching the grade their family
+            gave at sign-up. Children already in a section stay where they are.
           </p>
           <div className={base.buttonRow}>
             <button
               className={base.button}
               type="button"
               disabled={saving}
-              onClick={() => void placeEveryone()}
+              onClick={() => void placeRequested()}
             >
-              {saving ? 'Placing…' : 'Place everyone'}
+              {saving ? 'Placing…' : 'Place them'}
             </button>
             <button
               className={base.quietButton}
@@ -234,151 +221,143 @@ export function PlacementPanel({ coopId, overview, onOverview, reload, rotations
         </div>
       )}
 
-      {!overview.classes.length ? (
-        <p className={base.muted}>Add classes on the Schedule tab first.</p>
-      ) : (
-        <div className={styles.placementLayout}>
-          <div className={styles.stack} style={{ gap: 14 }}>
-            {[
-              ...rotations,
-              ...(unscheduled.length
-                ? [{ ageGroup: 'Not in the current schedule', classes: unscheduled }]
-                : []),
-            ].map((rotation) => (
-              <div className={styles.attendanceGroup} key={rotation.ageGroup}>
-                <h3 className={styles.groupTitle}>{rotation.ageGroup}</h3>
-                {rotation.classes.map((item) => {
-                  const stats = overview.classes.find((entry) => entry.id === item.id);
-                  const active = item.id === classId;
-                  return (
-                    <button
-                      key={`${rotation.ageGroup}-${item.id}`}
-                      type="button"
-                      className={`${styles.classPick} ${active ? styles.classPickActive : ''}`}
-                      aria-pressed={active}
-                      onClick={() => chooseClass(item.id)}
-                    >
-                      <span className={styles.rowTitle}>{item.name}</span>
-                      {stats && (
-                        <span
-                          className={`${styles.pill} ${stats.capacity !== null && stats.enrolled > stats.capacity ? styles.pillBad : stats.capacity !== null && stats.enrolled === stats.capacity ? styles.pillWarn : ''}`}
-                        >
-                          {stats.capacity === null
-                            ? `${stats.enrolled} in class`
-                            : `${stats.enrolled} / ${stats.capacity}`}
-                          {stats.waitlisted ? ` · ${stats.waitlisted} waiting` : ''}
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            ))}
-          </div>
+      <div className={styles.placementLayout}>
+        <div className={styles.stack} style={{ gap: 6 }}>
+          {overview.sections.map((item) => {
+            const count = children.filter((child) => child.sectionId === item.id).length;
+            const waiting = children.filter(
+              (child) => !child.sectionId && key(child.requestedSection) === key(item.name),
+            ).length;
+            const active = item.id === sectionId;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                className={`${styles.classPick} ${active ? styles.classPickActive : ''}`}
+                aria-pressed={active}
+                onClick={() => choose(item.id)}
+              >
+                <span className={styles.rowMain}>
+                  <span className={styles.rowTitle}>{item.name}</span>
+                  <span className={styles.rowMeta}>
+                    {item.classes.length} {item.classes.length === 1 ? 'class' : 'classes'}
+                    {item.status === 'approved' ? '' : ' · draft'}
+                  </span>
+                </span>
+                <span className={styles.rowActions}>
+                  {waiting > 0 && (
+                    <span className={`${styles.pill} ${styles.pillWarn}`}>{waiting} waiting</span>
+                  )}
+                  <span className={styles.pill}>
+                    {count} {count === 1 ? 'child' : 'children'}
+                  </span>
+                </span>
+              </button>
+            );
+          })}
+        </div>
 
-          {roster && (
-            <aside className={styles.placementSidebar} aria-label={`Who’s in ${roster.name}`}>
-              <div>
-                <p className={base.eyebrow} style={{ margin: 0 }}>
-                  Who’s in
-                </p>
-                <h3 className={styles.sectionTitle}>{roster.name}</h3>
-                <p className={base.muted} style={{ margin: '4px 0 0' }}>
-                  {selected.size} selected
-                  {roster.capacity !== null ? ` · ${roster.capacity} seats` : ''}
-                  {classGroups.length ? ` · for ${classGroups.join(', ')}` : ''}
-                </p>
-              </div>
-              <div className={base.buttonRow}>
-                {classGroups.map((ageGroup) => {
-                  const members = children.filter((child) => key(child.ageGroup) === key(ageGroup));
-                  const all =
-                    members.length > 0 && members.every((child) => selected.has(child.id));
-                  return (
-                    <button
-                      key={ageGroup}
-                      className={all ? base.quietButton : base.button}
-                      type="button"
-                      disabled={!members.length}
-                      onClick={() => selectGroup(ageGroup, !all)}
-                    >
-                      <Users aria-hidden="true" size={15} />
-                      {all ? `Clear ${ageGroup}` : `Select all ${ageGroup} (${members.length})`}
-                    </button>
-                  );
-                })}
-              </div>
-              {children.length > 8 && (
-                <label className={styles.searchField}>
-                  <Search aria-hidden="true" size={15} />
-                  <input
-                    type="search"
-                    placeholder="Find a child"
-                    aria-label="Find a child"
-                    value={query}
-                    onChange={(event) => setQuery(event.target.value)}
-                  />
-                </label>
-              )}
-              <div className={styles.placementList}>
-                {classGroups.length > 0 && (
-                  <>
-                    <h4 className={styles.groupTitle}>{classGroups.join(', ')}</h4>
-                    {inGroup.length ? (
-                      inGroup.map((child) => childCheck(child, false))
-                    ) : (
-                      <p className={base.muted}>
-                        No children in this age group{search ? ' match' : ' yet'}.
-                      </p>
-                    )}
-                  </>
-                )}
-                <details
-                  className={styles.otherGroups}
-                  open={otherSelected > 0 || !classGroups.length || Boolean(search)}
-                >
-                  <summary>
-                    {classGroups.length ? 'Add a child from another age group' : 'Children'}
-                    {otherSelected ? ` (${otherSelected} added)` : ''}
-                  </summary>
-                  <div className={styles.stack} style={{ gap: 6, marginTop: 8 }}>
-                    {others.length ? (
-                      others.map((child) => childCheck(child, classGroups.length > 0))
-                    ) : (
-                      <p className={base.muted}>No other children{search ? ' match' : ''}.</p>
-                    )}
-                  </div>
-                </details>
-              </div>
-              {overCapacity && (
-                <output className={styles.note} style={{ display: 'block' }}>
-                  That’s {selected.size - (roster.capacity ?? 0)} over the {roster.capacity} seats.
-                  You can still save it.
-                </output>
-              )}
+        {section && (
+          <aside className={styles.placementSidebar} aria-label={`Who’s in ${section.name}`}>
+            <div>
+              <p className={base.eyebrow} style={{ margin: 0 }}>
+                Who’s in
+              </p>
+              <h3 className={styles.sectionTitle}>{section.name}</h3>
+              <p className={base.muted} style={{ margin: '4px 0 0' }}>
+                {selected.size} selected
+                {section.classes.length
+                  ? ` · ${section.classes.map((item) => item.name).join(', ')}`
+                  : ' · no classes yet'}
+              </p>
+            </div>
+            {askedForThis.length > 0 && (
               <div className={base.buttonRow}>
                 <button
-                  className={base.button}
+                  className={allAsked ? base.quietButton : base.button}
                   type="button"
-                  disabled={saving || !changes}
-                  onClick={() => void save()}
+                  onClick={() => selectAsked(!allAsked)}
                 >
-                  {saving
-                    ? 'Saving…'
-                    : changes
-                      ? `Save ${changes} ${changes === 1 ? 'change' : 'changes'}`
-                      : 'Saved'}
+                  <Users aria-hidden="true" size={15} />
+                  {allAsked
+                    ? `Clear the ${askedForThis.length} who signed up for ${section.name}`
+                    : `Select all who signed up for ${section.name} (${askedForThis.length})`}
                 </button>
-                {changes > 0 && (
-                  <button className={base.quietButton} type="button" onClick={() => setDraft(null)}>
-                    Undo changes
-                  </button>
-                )}
               </div>
-            </aside>
-          )}
-        </div>
-      )}
+            )}
+            {children.length > 8 && (
+              <label className={styles.searchField}>
+                <Search aria-hidden="true" size={15} />
+                <input
+                  type="search"
+                  placeholder="Find a child"
+                  aria-label="Find a child"
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                />
+              </label>
+            )}
+            <div className={styles.placementList}>
+              <h4 className={styles.groupTitle}>In {section.name}</h4>
+              {members.length ? (
+                members.map((child) => childCheck(child, null))
+              ) : (
+                <p className={base.muted}>No one yet.</p>
+              )}
+              <h4 className={styles.groupTitle}>Not placed yet</h4>
+              {unplaced.length ? (
+                unplaced.map((child) =>
+                  childCheck(
+                    child,
+                    child.requestedSection
+                      ? `signed up for ${child.requestedSection}`
+                      : 'no grade given',
+                  ),
+                )
+              ) : (
+                <p className={base.muted}>Everyone is placed{search ? ' (or no match)' : ''}.</p>
+              )}
+              <details className={styles.otherGroups} open={movedHere > 0 || Boolean(search)}>
+                <summary>
+                  Move a child from another section
+                  {movedHere ? ` (${movedHere} moving here)` : ''}
+                </summary>
+                <div className={styles.stack} style={{ gap: 6, marginTop: 8 }}>
+                  {elsewhere.length ? (
+                    elsewhere.map((child) => childCheck(child, `now in ${child.sectionName}`))
+                  ) : (
+                    <p className={base.muted}>
+                      No children in other sections{search ? ' match' : ''}.
+                    </p>
+                  )}
+                </div>
+              </details>
+            </div>
+            <p className={base.muted} style={{ margin: 0 }}>
+              To change single classes for one child, open their family below.
+            </p>
+            <div className={base.buttonRow}>
+              <button
+                className={base.button}
+                type="button"
+                disabled={saving || !changes}
+                onClick={() => void save()}
+              >
+                {saving
+                  ? 'Saving…'
+                  : changes
+                    ? `Save ${changes} ${changes === 1 ? 'change' : 'changes'}`
+                    : 'Saved'}
+              </button>
+              {changes > 0 && (
+                <button className={base.quietButton} type="button" onClick={() => setDraft(null)}>
+                  Undo changes
+                </button>
+              )}
+            </div>
+          </aside>
+        )}
+      </div>
     </section>
   );
 }

@@ -12,9 +12,15 @@ import { ImportResult } from '@/lib/contracts/coop-features';
 import { previewClassImport } from '@/lib/coop/csv';
 import { formatMoney } from '@/lib/coop/money';
 
-type Props = { coopId: string; onImported: () => Promise<void> | void; onClose: () => void };
+type Props = {
+  coopId: string;
+  sectionId: string;
+  sectionName: string;
+  onImported: () => Promise<void> | void;
+  onClose: () => void;
+};
 
-export function ClassImport({ coopId, onImported, onClose }: Props) {
+export function ClassImport({ coopId, sectionId, sectionName, onImported, onClose }: Props) {
   const [text, setText] = useState('');
   const [importing, setImporting] = useState(false);
   const preview = text.trim() ? previewClassImport(text) : null;
@@ -33,7 +39,7 @@ export function ClassImport({ coopId, onImported, onClose }: Props) {
     setImporting(true);
     try {
       const result = await apiFetch(`/api/coops/${coopId}/classes/import`, {
-        ...post({ classes: preview.rows }),
+        ...post({ sectionId, classes: preview.rows }),
         schema: ImportResult,
       });
       toast.success(`${result.created} ${result.created === 1 ? 'class' : 'classes'} imported`);
@@ -53,7 +59,8 @@ export function ClassImport({ coopId, onImported, onClose }: Props) {
       <p className={base.muted} style={{ margin: 0 }}>
         Save your sheet as CSV (File → Download → CSV in Google Sheets, or Save As → CSV in Excel),
         or copy the cells and paste them below. The first row needs column names: Name, plus any of
-        Description, Teacher, Room, Time, Capacity, Fee, Materials.
+        Section, Description, Teacher, Room, Time, Capacity, Fee, Materials. Rows without a Section
+        go to {sectionName}.
       </p>
       <div className={base.buttonRow}>
         <label className={base.quietButton}>
@@ -70,8 +77,19 @@ export function ClassImport({ coopId, onImported, onClose }: Props) {
           type="button"
           onClick={() =>
             downloadCsv('kithwheel-classes-template.csv', [
-              ['Name', 'Description', 'Teacher', 'Room', 'Time', 'Capacity', 'Fee', 'Materials'],
               [
+                'Section',
+                'Name',
+                'Description',
+                'Teacher',
+                'Room',
+                'Time',
+                'Capacity',
+                'Fee',
+                'Materials',
+              ],
+              [
+                '2nd grade',
                 'Nature Journaling',
                 'Sketching outdoors',
                 'Ms. Rivera',
@@ -111,6 +129,7 @@ export function ClassImport({ coopId, onImported, onClose }: Props) {
               <table className={styles.table}>
                 <thead>
                   <tr>
+                    <th>Section</th>
                     <th>Class</th>
                     <th>Teacher</th>
                     <th>Time</th>
@@ -122,6 +141,7 @@ export function ClassImport({ coopId, onImported, onClose }: Props) {
                   {preview.rows.slice(0, 50).map((row, index) => (
                     // biome-ignore lint/suspicious/noArrayIndexKey: preview rows have no ids.
                     <tr key={index}>
+                      <td>{row.section || sectionName}</td>
                       <td>{row.name}</td>
                       <td>{row.teacher ?? ''}</td>
                       <td>{row.time ?? ''}</td>
