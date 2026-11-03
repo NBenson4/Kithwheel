@@ -31,7 +31,8 @@ export const CoopSettings = z.object({
   childFeeCents: z.number().int(),
   paymentInstructions: z.string().nullable(),
   volunteerMinutesRequired: z.number().int().nullable(),
-  hasCurrentSchedule: z.boolean(),
+  sectionsApproved: z.number().int(),
+  sectionsWithClasses: z.number().int(),
   counts: z.object({
     classes: z.number().int(),
     classFees: z.number().int(),
@@ -104,6 +105,8 @@ export const InviteAccepted = z.object({ coopId: z.string() });
 // ── Classes (import) ────────────────────────────────────────────────────────
 
 export const ImportedClassInput = z.object({
+  /** Section name from the spreadsheet; classes without one go to the section being viewed. */
+  section: z.string().trim().max(80).optional(),
   name: z.string().trim().min(1, 'Class name is required').max(120, 'Class name is too long'),
   description: optionalText(500, 'Description'),
   teacher: optionalText(120, 'Teacher name'),
@@ -114,12 +117,13 @@ export const ImportedClassInput = z.object({
   materials: optionalText(1000, 'Materials list'),
 });
 
-export const ClassImport = z.object({ classes: z.array(ImportedClassInput).min(1).max(200) });
+export const ClassImport = z.object({
+  sectionId: z.string().min(1),
+  classes: z.array(ImportedClassInput).min(1).max(200),
+});
 export const ImportResult = z.object({ created: z.number().int() });
 
 // ── Families ────────────────────────────────────────────────────────────────
-
-export const EnrollmentStatus = z.enum(['enrolled', 'waitlisted']);
 
 export const BalanceLine = z.object({ label: z.string(), amountCents: z.number().int() });
 export const Balance = z.object({
@@ -139,6 +143,27 @@ export const VolunteerLog = z.object({
   addedByCoordinator: z.boolean(),
 });
 
+export const ChildClass = z.object({
+  classId: z.string(),
+  className: z.string(),
+  time: z.string().nullable(),
+  sectionName: z.string().nullable(),
+  /** "section": part of the child's section schedule; "added": taken from another section. */
+  source: z.enum(['section', 'added']),
+});
+
+export const ChildRecord = z.object({
+  id: z.string(),
+  name: z.string(),
+  sectionId: z.string().nullable(),
+  sectionName: z.string().nullable(),
+  /** The grade the family gave at sign-up, shown until a coordinator assigns a section. */
+  requestedSection: z.string().nullable(),
+  classes: z.array(ChildClass),
+  skipped: z.array(z.object({ classId: z.string(), className: z.string() })),
+  clashes: z.array(z.tuple([z.string(), z.string()])),
+});
+
 export const FamilyRecord = z.object({
   id: z.string(),
   parentName: z.string(),
@@ -147,21 +172,7 @@ export const FamilyRecord = z.object({
   notes: z.string().nullable(),
   familyUrl: z.string(),
   createdAt: z.string(),
-  children: z.array(
-    z.object({
-      id: z.string(),
-      name: z.string(),
-      ageGroup: z.string().nullable(),
-      enrollments: z.array(
-        z.object({
-          id: z.string(),
-          classId: z.string(),
-          className: z.string(),
-          status: EnrollmentStatus,
-        }),
-      ),
-    }),
-  ),
+  children: z.array(ChildRecord),
   balance: Balance,
   charges: z.array(
     z.object({
@@ -187,35 +198,34 @@ export const FamilyRecord = z.object({
   }),
 });
 
-export const ClassRoster = z.object({
+export const SectionSummary = z.object({
   id: z.string(),
   name: z.string(),
-  capacity: z.number().int().nullable(),
-  feeCents: z.number().int(),
-  enrolled: z.number().int(),
-  waitlisted: z.number().int(),
-  roster: z.array(
+  status: z.enum(['draft', 'approved']),
+  classes: z.array(
     z.object({
-      enrollmentId: z.string(),
-      childName: z.string(),
-      familyId: z.string(),
-      familyName: z.string(),
-      status: EnrollmentStatus,
+      id: z.string(),
+      name: z.string(),
+      time: z.string().nullable(),
+      capacity: z.number().int().nullable(),
+      /** Children taking this class (section members minus skips, plus added). */
+      count: z.number().int(),
     }),
   ),
 });
 
 export const FamilyOverview = z.object({
   families: z.array(FamilyRecord),
-  classes: z.array(ClassRoster),
+  sections: z.array(SectionSummary),
   volunteerMinutesRequired: z.number().int().nullable(),
 });
 
 export const ChildInput = z.object({
   name: z.string().trim().min(1, 'Each child needs a name').max(120, 'Name is too long'),
-  ageGroup: z.string().trim().max(80).optional(),
-  /** Only coordinators choose classes; families' choices are ignored. */
-  classIds: z.array(z.string().min(1).max(60)).max(40).default([]),
+  /** The child's grade, as the family gives it (a section name). */
+  grade: z.string().trim().max(80).optional(),
+  /** Coordinators adding a child can put them straight into a section. */
+  sectionId: z.string().min(1).nullable().optional(),
 });
 
 export const FamilyCreate = z.object({
@@ -243,25 +253,27 @@ export const FamilyUpdate = z
   .partial()
   .refine((value) => Object.keys(value).length > 0, 'No changes were provided');
 
-export const EnrollmentAdd = z.object({ childId: z.string().min(1), classId: z.string().min(1) });
-
-/** The exact set of children who should be enrolled in one class. */
-export const RosterSet = z.object({ childIds: z.array(z.string().min(1).max(60)).max(1000) });
+/** Exactly which children are in one section (unticked children leave it). */
+export const SectionMembers = z.object({ childIds: z.array(z.string().min(1).max(60)).max(1000) });
 
 export const ChildUpdate = z
   .object({
     name: z.string().trim().min(1, 'Name is required').max(120, 'Name is too long'),
-    ageGroup: z.string().trim().max(80).nullable(),
+    sectionId: z.string().min(1).nullable(),
   })
   .partial()
   .refine((value) => Object.keys(value).length > 0, 'No changes were provided');
 
-export const AutoPlaceResult = z.object({ placed: z.number().int(), waitlisted: z.number().int() });
+/** One case-by-case change to a child's schedule. */
+export const ClassExceptionSet = z.object({
+  classId: z.string().min(1),
+  kind: z.enum(['add', 'skip']),
+});
+
+export const AssignResult = z.object({ assigned: z.number().int() });
 
 export const RegistrationResult = z.object({
   status: z.enum(['registered', 'already_registered']),
-  enrolled: z.array(z.object({ childName: z.string(), className: z.string() })),
-  waitlisted: z.array(z.object({ childName: z.string(), className: z.string() })),
 });
 
 // ── Fees ────────────────────────────────────────────────────────────────────
@@ -309,6 +321,8 @@ export const Announcement = z.object({
   id: z.string(),
   title: z.string(),
   body: z.string(),
+  sectionId: z.string().nullable(),
+  sectionName: z.string().nullable(),
   classId: z.string().nullable(),
   className: z.string().nullable(),
   recipientCount: z.number().int(),
@@ -320,6 +334,7 @@ export const AnnouncementList = z.object({ items: z.array(Announcement) });
 export const AnnouncementCreate = z.object({
   title: z.string().trim().min(1, 'Add a subject').max(150, 'Subject is too long'),
   body: z.string().trim().min(1, 'Write the announcement').max(5000, 'Message is too long'),
+  sectionId: z.string().min(1).nullable().optional(),
   classId: z.string().min(1).nullable().optional(),
 });
 
@@ -334,19 +349,17 @@ export const PublicClass = z.object({
   time: z.string().nullable(),
   materials: z.string().nullable(),
   feeCents: z.number().int(),
-  capacity: z.number().int().nullable(),
-  seatsLeft: z.number().int().nullable(),
-  waitlisted: z.number().int(),
 });
 
 export const PublicSchedule = z.object({
-  title: z.string(),
-  rotations: z.array(z.object({ ageGroup: z.string(), classes: z.array(PublicClass) })),
+  sections: z.array(z.object({ name: z.string(), classes: z.array(PublicClass) })),
 });
 
 export const PublicCoop = z.object({
   name: z.string(),
-  schedule: PublicSchedule.nullable(),
+  schedule: PublicSchedule,
+  /** Every section, for the grade picker on the sign-up form. */
+  grades: z.array(z.string()),
   registration: z.object({ open: z.boolean(), note: z.string().nullable() }),
   fees: z.object({ familyFeeCents: z.number().int(), childFeeCents: z.number().int() }),
   meetingDay: z.number().int().nullable(),
@@ -357,23 +370,23 @@ export const FamilyHome = z.object({
   coopName: z.string(),
   parentName: z.string(),
   email: z.string(),
+  grades: z.array(z.string()),
   children: z.array(
     z.object({
       id: z.string(),
       name: z.string(),
-      ageGroup: z.string().nullable(),
-      enrollments: z.array(
-        z.object({
-          id: z.string(),
-          classId: z.string(),
-          status: EnrollmentStatus,
-          waitlistPosition: z.number().int().nullable(),
-          class: PublicClass,
+      sectionName: z.string().nullable(),
+      /** Section schedule not approved yet, so classes aren't shown. */
+      awaitingApproval: z.boolean(),
+      classes: z.array(
+        PublicClass.extend({
+          source: z.enum(['section', 'added']),
+          sectionName: z.string().nullable(),
         }),
       ),
     }),
   ),
-  schedule: PublicSchedule.nullable(),
+  schedule: PublicSchedule,
   registrationOpen: z.boolean(),
   announcements: z.array(
     z.object({
@@ -381,6 +394,7 @@ export const FamilyHome = z.object({
       title: z.string(),
       body: z.string(),
       className: z.string().nullable(),
+      sectionName: z.string().nullable(),
       createdAt: z.string(),
     }),
   ),
@@ -419,7 +433,7 @@ export const AttendanceDay = z.object({
       childName: z.string(),
       familyId: z.string(),
       familyName: z.string(),
-      ageGroup: z.string().nullable(),
+      sectionName: z.string().nullable(),
       status: AttendanceStatus.nullable(),
       checkedInAt: z.string().nullable(),
       checkedOutAt: z.string().nullable(),
@@ -455,7 +469,7 @@ export const KioskDay = z.object({
       childId: z.string(),
       name: z.string(),
       familyName: z.string(),
-      ageGroup: z.string().nullable(),
+      sectionName: z.string().nullable(),
       checkedInAt: z.string().nullable(),
       checkedOutAt: z.string().nullable(),
     }),
@@ -473,7 +487,8 @@ export type KioskDay = z.infer<typeof KioskDay>;
 export type CoopSettings = z.infer<typeof CoopSettings>;
 export type Team = z.infer<typeof Team>;
 export type FamilyRecord = z.infer<typeof FamilyRecord>;
-export type ClassRoster = z.infer<typeof ClassRoster>;
+export type SectionSummary = z.infer<typeof SectionSummary>;
+export type ChildRecord = z.infer<typeof ChildRecord>;
 export type FamilyOverview = z.infer<typeof FamilyOverview>;
 export type Announcement = z.infer<typeof Announcement>;
 export type PublicCoop = z.infer<typeof PublicCoop>;

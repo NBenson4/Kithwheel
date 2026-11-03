@@ -43,14 +43,16 @@ export async function POST(request: Request, context: RouteContext) {
   }
   const body = await readBody(request, FamilyCreate);
   if (!body.ok) return body.response;
-  const input = { ...body.data, sendEmail: undefined };
+  // Families give a grade; only coordinators put children into sections.
+  const input = {
+    ...body.data,
+    sendEmail: undefined,
+    children: body.data.children.map((child) => ({ ...child, sectionId: null })),
+  };
 
   // Bots fill in the hidden "website" field; pretend it worked.
   if (input.website) {
-    return NextResponse.json(
-      RegistrationResult.parse({ status: 'registered', enrolled: [], waitlisted: [] }),
-      { status: 201 },
-    );
+    return NextResponse.json(RegistrationResult.parse({ status: 'registered' }), { status: 201 });
   }
   const today = await prisma.coopFamily.count({
     where: { coopId: coop.id, createdAt: { gt: new Date(Date.now() - 24 * 60 * 60 * 1000) } },
@@ -79,9 +81,7 @@ export async function POST(request: Request, context: RouteContext) {
           url: familyUrl(outcome.accessToken),
         }),
       }).catch(() => undefined);
-      return NextResponse.json(
-        RegistrationResult.parse({ status: 'already_registered', enrolled: [], waitlisted: [] }),
-      );
+      return NextResponse.json(RegistrationResult.parse({ status: 'already_registered' }));
     }
     await sendFamilyWelcome(coop.name, input, outcome, coordinators[0]).catch(() => undefined);
     await Promise.allSettled(
@@ -94,9 +94,7 @@ export async function POST(request: Request, context: RouteContext) {
             title: `${input.parentName} registered with ${coop.name}`,
             lines: [
               `${input.children.length} ${input.children.length === 1 ? 'child' : 'children'}: ${input.children.map((child) => child.name).join(', ')}.`,
-              ...(outcome.waitlisted.length
-                ? [`${outcome.waitlisted.length} class choice(s) went to the waitlist.`]
-                : []),
+              'Place them in their sections on the Families tab.',
             ],
             cta: {
               label: 'Open Families',
@@ -106,14 +104,7 @@ export async function POST(request: Request, context: RouteContext) {
         }),
       ),
     );
-    return NextResponse.json(
-      RegistrationResult.parse({
-        status: 'registered',
-        enrolled: outcome.enrolled,
-        waitlisted: outcome.waitlisted,
-      }),
-      { status: 201 },
-    );
+    return NextResponse.json(RegistrationResult.parse({ status: 'registered' }), { status: 201 });
   } catch {
     return serverError();
   }

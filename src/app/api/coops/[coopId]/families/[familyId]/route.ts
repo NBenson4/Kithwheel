@@ -1,9 +1,8 @@
-// Edit or remove one family. Removing a family frees its seats for the waitlist.
+// Edit or remove one family.
 import 'server-only';
 import { NextResponse } from 'next/server';
 import { readFamilyOverview } from '@/lib/business/coop-views';
 import { requireCoopEditor } from '@/lib/business/coordinator-auth';
-import { fillOpenSeats, notifyPromotions } from '@/lib/business/families';
 import { guardOrigin, notFound, readBody, serverError } from '@/lib/business/route-helpers';
 import { FamilyUpdate } from '@/lib/contracts/coop-features';
 import { prisma } from '@/lib/db';
@@ -46,22 +45,7 @@ export async function DELETE(request: Request, context: RouteContext) {
   const { coopId, familyId } = await context.params;
   const access = await requireCoopEditor(coopId);
   if (!access.ok) return access.response;
-  try {
-    const family = await prisma.coopFamily.findFirst({
-      where: { id: familyId, coopId },
-      select: { children: { select: { enrollments: { select: { classId: true } } } } },
-    });
-    if (!family) return notFound('Family');
-    const classIds = family.children.flatMap((child) =>
-      child.enrollments.map((entry) => entry.classId),
-    );
-    const promotions = await prisma.$transaction(async (tx) => {
-      await tx.coopFamily.delete({ where: { id: familyId } });
-      return fillOpenSeats(tx, classIds);
-    });
-    await notifyPromotions(promotions);
-    return NextResponse.json(await readFamilyOverview(coopId));
-  } catch {
-    return serverError();
-  }
+  const result = await prisma.coopFamily.deleteMany({ where: { id: familyId, coopId } });
+  if (!result.count) return notFound('Family');
+  return NextResponse.json(await readFamilyOverview(coopId));
 }

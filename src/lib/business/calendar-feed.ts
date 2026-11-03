@@ -46,16 +46,10 @@ export function buildFeed(coop: CoopCalendarFields, classes: CalendarClass[], sc
   });
 }
 
-/** Every class in the current schedule, labelled with the age groups taking it. */
+/** Every class in the approved section schedules, labelled with its section. */
 export async function coopCalendarClasses(coopId: string): Promise<CalendarClass[]> {
   const schedule = await readPublicSchedule(coopId);
-  const byId = new Map<string, CalendarClass>();
-  for (const rotation of schedule?.rotations ?? []) {
-    for (const item of rotation.classes) {
-      const existing = byId.get(item.id);
-      if (existing) existing.forWhom.push(rotation.ageGroup);
-      else byId.set(item.id, { ...item, forWhom: [rotation.ageGroup] });
-    }
-  }
-  return [...byId.values()];
+  return schedule.sections.flatMap((section) =>
+    section.classes.map((item) => ({ ...item, forWhom: [section.name] })),
+  );
 }

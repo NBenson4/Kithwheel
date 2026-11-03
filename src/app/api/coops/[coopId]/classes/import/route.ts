@@ -1,12 +1,15 @@
-// Bulk-create classes from a spreadsheet (parsed and previewed in the browser).
+// Bulk-create classes from a spreadsheet (parsed and previewed in the browser). Rows with a
+// Section column go to that section when its name matches; the rest go to the chosen section.
 import 'server-only';
 import { NextResponse } from 'next/server';
 import { requireCoopEditor } from '@/lib/business/coordinator-auth';
-import { guardOrigin, readBody, serverError } from '@/lib/business/route-helpers';
+import { guardOrigin, notFound, readBody, serverError } from '@/lib/business/route-helpers';
 import { ClassImport, ImportResult } from '@/lib/contracts/coop-features';
 import { prisma } from '@/lib/db';
 
 type RouteContext = { params: Promise<{ coopId: string }> };
+
+const key = (value: string) => value.trim().toLowerCase();
 
 export async function POST(request: Request, context: RouteContext) {
   const blocked = guardOrigin(request);
@@ -16,23 +19,37 @@ export async function POST(request: Request, context: RouteContext) {
   if (!access.ok) return access.response;
   const body = await readBody(request, ClassImport);
   if (!body.ok) return body.response;
+  const sections = await prisma.coopSection.findMany({
+    where: { coopId },
+    select: { id: true, name: true, _count: { select: { classes: true } } },
+  });
+  if (!sections.some((section) => section.id === body.data.sectionId)) return notFound('Section');
   const existing = await prisma.coopClass.count({ where: { coopId } });
   if (existing + body.data.classes.length > 500) {
     return NextResponse.json({ error: 'A co-op can have up to 500 classes.' }, { status: 409 });
   }
+  const byName = new Map(sections.map((section) => [key(section.name), section.id]));
+  const nextPosition = new Map(sections.map((section) => [section.id, section._count.classes]));
   try {
     const result = await prisma.coopClass.createMany({
-      data: body.data.classes.map((item) => ({
-        coopId,
-        name: item.name,
-        description: item.description || null,
-        teacher: item.teacher || null,
-        room: item.room || null,
-        time: item.time || null,
-        capacity: item.capacity ?? null,
-        feeCents: item.feeCents ?? 0,
-        materials: item.materials || null,
-      })),
+      data: body.data.classes.map((item) => {
+        const sectionId = (item.section && byName.get(key(item.section))) || body.data.sectionId;
+        const position = nextPosition.get(sectionId) ?? 0;
+        nextPosition.set(sectionId, position + 1);
+        return {
+          coopId,
+          sectionId,
+          position,
+          name: item.name,
+          description: item.description || null,
+          teacher: item.teacher || null,
+          room: item.room || null,
+          time: item.time || null,
+          capacity: item.capacity ?? null,
+          feeCents: item.feeCents ?? 0,
+          materials: item.materials || null,
+        };
+      }),
     });
     return NextResponse.json(ImportResult.parse({ created: result.count }), { status: 201 });
   } catch {
