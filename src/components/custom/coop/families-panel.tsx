@@ -69,7 +69,7 @@ function RegistrationCard({ coopId, settings, onSettings }: Props) {
       <div className={styles.stack}>
         <p className={base.muted}>
           While registration is open, your family link shows a short sign-up form: the parent’s name
-          and email, and each child’s name and age group. Families don’t choose classes.
+          and email, and each child’s name and grade. Families don’t choose classes.
         </p>
         <div className={base.buttonRow}>
           <button

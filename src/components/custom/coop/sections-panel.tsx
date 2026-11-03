@@ -295,67 +295,79 @@ export function SectionsPanel({ coopId, sections, onSections, onChanged }: Props
   }
 
   return (
-    <div
-      className={styles.placementLayout}
-      style={{ gridTemplateColumns: 'minmax(220px, 300px) minmax(0, 1fr)' }}
-    >
+    <div className={styles.sectionsLayout}>
       <nav className={styles.stack} style={{ gap: 6 }} aria-label="Grade sections">
         <h2 className={styles.groupTitle} style={{ marginTop: 0 }}>
           Grade sections
         </h2>
-        {sections.items.map((item) => (
-          <button
-            key={item.id}
-            type="button"
-            className={`${styles.classPick} ${item.id === section?.id ? styles.classPickActive : ''}`}
-            aria-pressed={item.id === section?.id}
-            onClick={() => choose(item.id)}
-          >
-            <span className={styles.rowMain}>
-              <span className={styles.rowTitle}>{item.name}</span>
-              <span className={styles.rowMeta}>
-                {item.classes.length} {item.classes.length === 1 ? 'class' : 'classes'} ·{' '}
-                {item.childCount} {item.childCount === 1 ? 'child' : 'children'}
+        <div className={styles.sectionList}>
+          {sections.items.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              className={`${styles.classPick} ${item.id === section?.id ? styles.classPickActive : ''}`}
+              aria-pressed={item.id === section?.id}
+              onClick={() => choose(item.id)}
+            >
+              <span className={styles.rowMain}>
+                <span className={styles.rowTitle}>{item.name}</span>
+                <span className={styles.rowMeta}>
+                  {item.classes.length} {item.classes.length === 1 ? 'class' : 'classes'} ·{' '}
+                  {item.childCount} {item.childCount === 1 ? 'child' : 'children'}
+                </span>
               </span>
+              <span
+                className={`${styles.pill} ${item.status === 'approved' ? styles.pillGood : ''}`}
+              >
+                {item.status === 'approved' ? 'Approved' : 'Draft'}
+              </span>
+            </button>
+          ))}
+        </div>
+        <details className={styles.details}>
+          <summary>
+            <span
+              className={styles.rowTitle}
+              style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}
+            >
+              <Plus aria-hidden="true" size={14} /> Add a section
             </span>
-            <span className={`${styles.pill} ${item.status === 'approved' ? styles.pillGood : ''}`}>
-              {item.status === 'approved' ? 'Approved' : 'Draft'}
-            </span>
-          </button>
-        ))}
-        <form
-          className={base.inlineForm}
-          onSubmit={async (event) => {
-            event.preventDefault();
-            const ok = await run(
-              `/api/coops/${coopId}/sections`,
-              post({ name: newSection }),
-              `${newSection} added`,
-            );
-            if (ok) setNewSection('');
-          }}
-        >
-          <label className={base.smallLabel} htmlFor="new-section">
-            Add a section
-            <input
-              id="new-section"
-              className={base.field}
-              value={newSection}
-              required
-              maxLength={80}
-              placeholder="e.g. 9th–12th grade"
-              onChange={(event) => setNewSection(event.target.value)}
-            />
-          </label>
-          <button className={base.quietButton} type="submit" disabled={busy}>
-            <Plus aria-hidden="true" size={14} /> Add section
-          </button>
-        </form>
+          </summary>
+          <form
+            className={base.inlineForm}
+            style={{ margin: 12 }}
+            onSubmit={async (event) => {
+              event.preventDefault();
+              const ok = await run(
+                `/api/coops/${coopId}/sections`,
+                post({ name: newSection }),
+                `${newSection} added`,
+              );
+              if (ok) setNewSection('');
+            }}
+          >
+            <label className={base.smallLabel} htmlFor="new-section">
+              Section name
+              <input
+                id="new-section"
+                className={base.field}
+                value={newSection}
+                required
+                maxLength={80}
+                placeholder="e.g. 9th–12th grade"
+                onChange={(event) => setNewSection(event.target.value)}
+              />
+            </label>
+            <button className={base.quietButton} type="submit" disabled={busy}>
+              <Plus aria-hidden="true" size={14} /> Add section
+            </button>
+          </form>
+        </details>
       </nav>
 
       {section ? (
         <section className={base.panel} aria-labelledby="section-heading">
-          <div className={base.panelHeader} style={{ alignItems: 'flex-start' }}>
+          <div className={base.panelHeader} style={{ alignItems: 'flex-start', flexWrap: 'wrap' }}>
             <div>
               {renaming !== null ? (
                 <form

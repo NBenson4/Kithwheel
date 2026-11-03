@@ -82,7 +82,7 @@ test('coordinator builds and approves grade-section schedules that families can 
     await page.getByLabel('Class name').fill(name as string);
     await page.getByLabel('Time (e.g. 9:00-9:50)').fill(time as string);
     await page.getByLabel('Teacher').fill('Ms. Erin');
-    await page.getByRole('button', { name: 'Add class' }).click();
+    await page.getByRole('button', { name: 'Add class', exact: true }).click();
     await expect(page.getByRole('button', { name: `Edit ${name}` })).toBeVisible();
   }
   // Reorder: Reading first.
@@ -99,11 +99,12 @@ test('coordinator builds and approves grade-section schedules that families can 
   await nav.getByRole('button', { name: /^3rd grade/ }).click();
   await page.getByRole('button', { name: 'Add a class to 3rd grade' }).click();
   await page.getByLabel('Class name').fill('Fractions');
-  await page.getByRole('button', { name: 'Add class' }).click();
+  await page.getByRole('button', { name: 'Add class', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Edit Fractions' })).toBeVisible();
 
   // Sections are adjustable: add one, then remove it while it's empty.
-  await page.getByLabel('Add a section').fill('Teen electives');
+  await page.getByText('Add a section').click();
+  await page.getByLabel('Section name', { exact: true }).fill('Teen electives');
   await page.getByRole('button', { name: 'Add section' }).click();
   await nav.getByRole('button', { name: /^Teen electives/ }).click();
   await page.getByText('Section settings').click();
@@ -144,7 +145,9 @@ test('coordinator builds and approves grade-section schedules that families can 
   // Moving a class to another section.
   await nav.getByRole('button', { name: /^2nd grade/ }).click();
   await page.getByRole('button', { name: 'Edit Math' }).click();
-  await page.getByLabel('Section').selectOption({ label: '3rd grade' });
+  await page
+    .getByRole('combobox', { name: 'Section', exact: true })
+    .selectOption({ label: '3rd grade' });
   await page.getByRole('button', { name: 'Save class' }).click();
   await expect(page.getByRole('button', { name: 'Edit Math' })).toHaveCount(0);
   await nav.getByRole('button', { name: /^3rd grade/ }).click();

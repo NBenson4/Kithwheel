@@ -16,17 +16,17 @@ export const metadata: Metadata = {
 const capabilities = [
   {
     number: '01',
-    title: 'Plan the whole rotation',
+    title: 'A schedule for every grade',
     description:
-      'Build age-group class rotations, assign teachers and rooms, then keep the schedule easy for families to find.',
-    note: 'Classes · teachers · rooms',
+      'Give each grade, from Pre-K to 12th, its own schedule with teachers, rooms and times, approved by you before families see it.',
+    note: 'Pre-K–12 · teachers · rooms',
     soon: false,
   },
   {
     number: '02',
     title: 'Bring family sign-ups together',
     description:
-      'Families register in minutes. You place children by age group, with exceptions for anyone who tests up, and full classes keep a waitlist.',
+      'Families register in minutes. You place each child in their grade section, with single-class exceptions for anyone who tests up.',
     note: 'Registration · placement · waitlists',
     soon: false,
   },

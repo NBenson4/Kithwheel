@@ -58,7 +58,7 @@ async function json(request: APIRequestContext, method: string, path: string, da
   return { status: response.status(), body };
 }
 
-test('a co-op runs registration, waitlists, family pages, fees, hours, announcements and check-in', async ({
+test('a co-op runs grade sections, registration, placement, family pages, fees, hours, announcements and check-in', async ({
   browser,
   page,
 }) => {
@@ -89,13 +89,11 @@ test('a co-op runs registration, waitlists, family pages, fees, hours, announcem
     name: 'Music Circle',
     time: '10:00-10:50',
   });
-  const science = (
-    await json(api, 'POST', `/api/coops/${coop.id}/classes`, {
-      sectionId: firstGrade,
-      name: 'Science Lab',
-      time: '9:00-9:50',
-    })
-  ).body;
+  await json(api, 'POST', `/api/coops/${coop.id}/classes`, {
+    sectionId: firstGrade,
+    name: 'Science Lab',
+    time: '9:00-9:50',
+  });
   for (const id of [kindergarten, firstGrade]) {
     expect(
       (await json(api, 'PATCH', `/api/coops/${coop.id}/sections/${id}`, { status: 'approved' }))
@@ -140,7 +138,7 @@ test('a co-op runs registration, waitlists, family pages, fees, hours, announcem
   await familyPage.getByLabel('Name', { exact: true }).fill('Ann');
   // Families give a grade; they don't pick classes.
   await expect(familyPage.getByRole('checkbox', { name: /Art Studio/ })).toHaveCount(0);
-  await familyPage.getByLabel('Grade').selectOption('Kindergarten');
+  await familyPage.getByRole('combobox', { name: 'Grade' }).selectOption('Kindergarten');
   await familyPage.getByRole('button', { name: 'Register' }).last().click();
   await expect(familyPage.getByRole('heading', { name: 'You’re registered!' })).toBeVisible();
   await expect(
@@ -259,7 +257,7 @@ test('a co-op runs registration, waitlists, family pages, fees, hours, announcem
 
   // Coordinator workspace: approve hours, record a payment, send an announcement.
   await page.goto(`/dashboard?coop=${coop.id}&tab=volunteer`);
-  await page.getByRole('button', { name: 'Approve' }).click();
+  await page.getByRole('button', { name: 'Approve', exact: true }).click();
   await expect(page.getByText('Nothing waiting.')).toBeVisible();
 
   await page.getByRole('button', { name: 'Fees', exact: true }).click();
@@ -363,7 +361,7 @@ test('a co-op runs registration, waitlists, family pages, fees, hours, announcem
     {
       parentName: 'Late Family',
       email: `late-${randomUUID()}@example.test`,
-      children: [{ name: 'Lou', classIds: [music.id] }],
+      children: [{ name: 'Lou', grade: 'Kindergarten' }],
     },
   );
   expect(closed.status).toBe(409);
